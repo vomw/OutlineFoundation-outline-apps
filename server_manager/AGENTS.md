@@ -13,7 +13,8 @@ The `/server_manager` directory contains the source code for the Outline Server 
 
 ## Key Technologies
 
-*   **Lit**: The primary UI framework for the Server Manager's web-based components.
+*   **Lit**: The primary UI framework for the Server Manager's web-based components. New components use Lit.
+*   **Polymer**: Still used in legacy app shell components (`/www/ui_components/`). Being migrated to Lit.
 *   **Electron**: Used to build the desktop version of the Server Manager.
 *   **TypeScript**: Used for all web-based code.
 *   **Shadowbox**: The core proxy component of Outline, which is managed by the Server Manager.

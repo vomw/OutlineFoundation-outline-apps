@@ -15,8 +15,7 @@ The `/client` directory contains the source code for all Outline client applicat
 
 *   **Electron**: Used to build the desktop client for Windows and Linux.
 *   **Cordova**: Used to build the clients for macOS, iOS, Android.
-*   **[Lit](https://lit.dev/)**: a simple library for building fast, lightweight web components, core to the client's web-based components.
-*   **Polymer**: The legacy UI framework used before Lit.
+*   **[Lit](https://lit.dev/)**: The UI framework for all web components in the client.
 *   **TypeScript**: Used for all web-based code.
 *   **Go**: Used to implement the networking and other shared code.
 

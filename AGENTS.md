@@ -54,5 +54,5 @@ Platform-specific requirements (Android SDK, Xcode, zig for cross-compilation) a
 *   **Server Manager**: The application used to create and manage Outline servers on cloud providers.
 *   **Electron**: Framework used to build the desktop versions of the Outline Client and Server Manager.
 *   **Cordova**: Framework used to build the mobile (iOS/Android) and macOS versions of the Outline Client.
-*   **Lit**: The UI framework for web components (replacing the legacy Polymer framework).
+*   **Lit**: The UI framework for web components. All new components use Lit. The client has fully migrated; the server_manager still has legacy Polymer components in its app shell being migrated.
 *   **OutlineAction**: A custom build script (`.action.sh` or `.action.mjs`) that defines a task runnable via `npm run action`.
