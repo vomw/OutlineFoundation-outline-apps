@@ -32,6 +32,11 @@ npm run action client/src/cordova/setup macos -- --buildMode=release
 *   `npm run storybook`: Launch the Storybook UI component explorer.
 *   `npm run lint:gts`: Lint TypeScript (pass filepaths on macOS; works on all files on Linux).
 
+## Code Style
+
+*   **TypeScript**: Follows [Google's TypeScript style](https://google.github.io/styleguide/tsguide.html), enforced by [`gts`](https://github.com/google/gts). Run `npm run lint:gts` to check and `npm run format:all` to auto-fix (Linux only for whole codebase; pass specific filepaths on macOS).
+*   **Go**: Follows standard Go style. Use `gofmt` and `go vet`.
+
 ## Requirements
 
 | Component | Version |
