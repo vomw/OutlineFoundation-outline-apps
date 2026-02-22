@@ -108,7 +108,7 @@ declare -ar PACKAGES=(
 declare packages_csv
 packages_csv="$(printf ',%s' "${PACKAGES[@]}")"
 packages_csv="${packages_csv:1}"
-curl --remote-name-all --fail "https://download.docker.com/linux/ubuntu/dists/noble/pool/stable/amd64/{${packages_csv}}"
+curl --remote-name-all --fail --location --retry 5 --retry-delay 5 --connect-timeout 10 --max-time 120 "https://download.docker.com/linux/ubuntu/dists/noble/pool/stable/amd64/{${packages_csv}}"
 log_for_sentry "Installing Docker"
 dpkg --install "${PACKAGES[@]}"
 rm "${PACKAGES[@]}"
