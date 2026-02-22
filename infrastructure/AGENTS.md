@@ -15,14 +15,14 @@ The `npm run action` command is the heart of the Outline build system. It is imp
 
 ### Creating a New Action
 
-To create a new action, you need to create a new `.mjs` file in the appropriate directory (e.g., `server_manager/www/my_action.mjs`). This file should export a default function that will be executed when the action is run.
+To create a new action, you need to create a new `.mjs` file in the appropriate directory that matches the `*.action.mjs` naming convention (e.g., `server_manager/www/my_action.action.mjs`). This file should export a default function that will be executed when the action is run.
 
 The function will be passed an `options` object containing the command-line arguments. You can use the utility functions in `/infrastructure` to perform common tasks like spawning processes, downloading files, and creating reload servers.
 
 ### Example Action
 
 ```javascript
-// server_manager/www/my_action.mjs
+// server_manager/www/my_action.action.mjs
 import { spawnStream } from '../../infrastructure/build/spawn_stream.mjs';
 
 export default async function(options) {
