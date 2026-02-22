@@ -38,7 +38,7 @@ The `npm run action` command is used to build and run the Server Manager.
 *   **Run**: `npm run action server_manager/electron/start ${PLATFORM}`
 *   **Run with development build**: `BUILD_ENV=development npm run action server_manager/electron/start ${PLATFORM}`
 
-Where `${PLATFORM}` is one of `linux`, `macos`, `windows`. If ommitted, it assumes the host platform.
+Where `${PLATFORM}` is one of `linux`, `macos`, `windows`. If omitted, it assumes the host platform.
 
 ### Packaging
 
@@ -48,7 +48,11 @@ To build the app binary:
 npm run action server_manager/electron/package ${PLATFORM} -- --buildMode=[debug,release]
 ```
 
-The per-platform standalone apps will be at `output/build/server_manager/electron/static/dist`.
+The per-platform standalone apps will be at `output/build/server_manager/electron/static/dist`:
+
+- **Windows**: `.exe` — only generated if [wine](https://www.winehq.org/download) is installed.
+- **Linux**: `.AppImage`
+- **macOS**: `.dmg` and `.zip` (both required for auto-update). You may need to run `security unlock-keychain login.keychain` so electron-builder has access to your certificates.
 
 ## Debugging
 
