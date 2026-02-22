@@ -14,6 +14,8 @@ Outline makes it easy for anyone to create a VPN server, allowing you to share a
 
 Interested in **contributing to Outline?** See our [Contributing Guide](CONTRIBUTING.md) for more information.
 
+See [AGENTS.md](./AGENTS.md) for AI agent and developer guidance.
+
 You can also **join the Outline Community** by signing up for the [IFF Mattermost](https://wiki.digitalrights.community/index.php?title=IFF_Mattermost)!
 
 For customer support and to **contact us directly**, go to https://support.getoutline.org.
