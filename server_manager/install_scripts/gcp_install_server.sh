@@ -43,7 +43,7 @@ function log_for_sentry() {
 }
 
 function post_sentry_report() {
-  if [[ -n "${SENTRY_API_URL}" ]]; then
+  if [[ -n "${SENTRY_API_URL:-}" ]]; then
     # Get JSON formatted string.  This command replaces newlines with literal '\n'
     # but otherwise assumes that there are no other characters to escape for JSON.
     # If we need better escaping, we can install the jq command line tool.
@@ -69,7 +69,6 @@ function cloud::set_guest_attribute() {
 cloud::set_guest_attribute "install-started" "true"
 
 # Enable BBR.
-# Recent DigitalOcean one-click images are based on Ubuntu 18 and have kernel 4.15+.
 log_for_sentry "Enabling BBR"
 cat >> /etc/sysctl.conf << EOF
 
@@ -101,15 +100,15 @@ log_for_sentry "Downloading Docker"
 # Following instructions from https://docs.docker.com/engine/install/ubuntu/#install-from-a-package
 
 declare -ar PACKAGES=(
-  'containerd.io_1.4.9-1_amd64.deb'
-  'docker-ce_20.10.8~3-0~ubuntu-focal_amd64.deb'
-  'docker-ce-cli_20.10.8~3-0~ubuntu-focal_amd64.deb'
+  'containerd.io_2.2.1-1~ubuntu.24.04~noble_amd64.deb'
+  'docker-ce_29.2.1-1~ubuntu.24.04~noble_amd64.deb'
+  'docker-ce-cli_29.2.1-1~ubuntu.24.04~noble_amd64.deb'
 )
 
 declare packages_csv
 packages_csv="$(printf ',%s' "${PACKAGES[@]}")"
 packages_csv="${packages_csv:1}"
-curl --remote-name-all --fail "https://download.docker.com/linux/ubuntu/dists/focal/pool/stable/amd64/{${packages_csv}}"
+curl --remote-name-all --fail --location --retry 5 --retry-delay 5 --connect-timeout 10 --max-time 120 "https://download.docker.com/linux/ubuntu/dists/noble/pool/stable/amd64/{${packages_csv}}"
 log_for_sentry "Installing Docker"
 dpkg --install "${PACKAGES[@]}"
 rm "${PACKAGES[@]}"
