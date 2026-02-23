@@ -85,6 +85,12 @@ The per-platform standalone apps will be at `output/build/server_manager/electro
 
 > NOTE: If you are building for macOS, you may need to run `security unlock-keychain login.keychain` so electron-builder has access to your certificates.
 
+## Testing
+
+```
+npm run action server_manager/test
+```
+
 ## Error reporting
 
 To enable error reporting through [Sentry](https://sentry.io/) for local builds, run:
