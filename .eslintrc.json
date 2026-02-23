@@ -147,7 +147,11 @@
         "server_manager/electron/release/notarize.js",
         "server_manager/install_scripts/build_do_install_script_ts.node.js",
         "server_manager/install_scripts/build_gcp_install_script_ts.node.js",
-        "server_manager/www/karma.conf.js"
+        "server_manager/www/karma.conf.js",
+        "server_manager/electron_main.webpack.mjs",
+        "server_manager/electron_preload.webpack.mjs",
+        ".prettierrc.js",
+        "client/web/karma.conf.js"
       ],
       "extends": [
         "plugin:@typescript-eslint/disable-type-checked"
