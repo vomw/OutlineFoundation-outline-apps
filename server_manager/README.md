@@ -26,6 +26,42 @@ To run the Outline Manager as a web app on the browser and listen for changes:
 npm run action server_manager/www/start
 ```
 
+## Updating Cloud Locations
+
+When new cloud regions/zones appear (especially for GCP), update all of the
+following so the location picker shows proper city and country data.
+
+1. Add geolocation constants in `server_manager/model/location.ts`.
+2. Map cloud region IDs to `GeoLocation` in `server_manager/model/gcp.ts`
+   (`Zone.LOCATION_MAP`).
+3. Add localized city message keys:
+   - Source messages: `server_manager/messages/master_messages.json` using
+     `geo_*` keys.
+   - Runtime English messages: `server_manager/messages/en.json` and
+     `server_manager/messages/en-GB.json` using `geo-*` keys.
+4. Keep all `geo_*` / `geo-*` message keys alphabetically sorted.
+5. Update tests:
+   - `server_manager/model/gcp.spec.ts` region coverage list and assertions.
+   - `server_manager/www/location_formatting.spec.ts` if formatting/sorting
+     behavior changes.
+6. Verify:
+
+```bash
+npx tsc -p server_manager --outDir output/build/js/server_manager --module commonjs
+npx jasmine output/build/js/server_manager/model/gcp.spec.js output/build/js/server_manager/www/location_formatting.spec.js
+npm run action server_manager/www/test
+```
+
+Notes:
+- Missing entries in `Zone.LOCATION_MAP` cause unknown location cards (`?` and
+  raw zone IDs) in the picker.
+- Region discovery can be checked programmatically with:
+
+```bash
+gcloud compute regions list --format="value(name)"
+gcloud compute zones list --format="value(name)"
+```
+
 ## Debug an existing binary
 
 You can run an existing binary in debug mode by setting `OUTLINE_DEBUG=true`.

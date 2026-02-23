@@ -144,13 +144,33 @@
     "message": "Bangalore",
     "description": "Name of the city in India."
   },
+  "geo_berlin": {
+    "message": "Berlin",
+    "description": "Name of the city in Germany."
+  },
   "geo_changhua_county": {
     "message": "Changhua County",
     "description": "Name of the county in Taiwan."
   },
+  "geo_columbus": {
+    "message": "Columbus",
+    "description": "Name of the city in Ohio, USA."
+  },
+  "geo_dallas": {
+    "message": "Dallas",
+    "description": "Name of the city in Texas, USA."
+  },
+  "geo_dammam": {
+    "message": "Dammam",
+    "description": "Name of the city in Saudi Arabia."
+  },
   "geo_delhi": {
     "message": "Delhi",
     "description": "Name of the city in India."
+  },
+  "geo_doha": {
+    "message": "Doha",
+    "description": "Name of the city in Qatar."
   },
   "geo_eemshaven": {
     "message": "Eemshaven",
@@ -176,9 +196,17 @@
     "message": "Jakarta",
     "description": "Name of the capital of Indonesia."
   },
+  "geo_johannesburg": {
+    "message": "Johannesburg",
+    "description": "Name of the city in South Africa."
+  },
   "geo_jurong_west": {
     "message": "Jurong West",
     "description": "Name of the area in Singapore."
+  },
+  "geo_kuala_lumpur": {
+    "message": "Kuala Lumpur",
+    "description": "Name of the capital city of Malaysia."
   },
   "geo_las_vegas": {
     "message": "Las Vegas",
@@ -192,9 +220,17 @@
     "message": "Los Angeles",
     "description": "Name of the city in California, USA."
   },
+  "geo_madrid": {
+    "message": "Madrid",
+    "description": "Name of the city in Spain."
+  },
   "geo_melbourne": {
     "message": "Melbourne",
     "description": "Name of the city in Australia."
+  },
+  "geo_milan": {
+    "message": "Milan",
+    "description": "Name of the city in Italy."
   },
   "geo_montreal": {
     "message": "Montréal",
@@ -220,6 +256,14 @@
     "message": "Osaka",
     "description": "Name of the city in Japan."
   },
+  "geo_paris": {
+    "message": "Paris",
+    "description": "Name of the city in France."
+  },
+  "geo_queretaro": {
+    "message": "Querétaro",
+    "description": "Name of the city in Mexico."
+  },
   "geo_salt_lake_city": {
     "message": "Salt Lake City",
     "description": "Name of the city in Utah, USA."
@@ -227,6 +271,10 @@
   "geo_san_francisco": {
     "message": "San Francisco",
     "description": "Name of the city in the United States."
+  },
+  "geo_santiago": {
+    "message": "Santiago",
+    "description": "Name of the city in Chile."
   },
   "geo_sao_paulo": {
     "message": "São Paulo",
@@ -248,9 +296,17 @@
     "message": "St. Ghislain",
     "description": "Name of the town in Belgium."
   },
+  "geo_stockholm": {
+    "message": "Stockholm",
+    "description": "Name of the city in Sweden."
+  },
   "geo_sydney": {
     "message": "Sydney",
     "description": "Name of the city in Australia."
+  },
+  "geo_tel_aviv": {
+    "message": "Tel Aviv",
+    "description": "Name of the city in Israel."
   },
   "geo_tokyo": {
     "message": "Tokyo",
@@ -259,6 +315,10 @@
   "geo_toronto": {
     "message": "Toronto",
     "description": "Name of the city in Canada."
+  },
+  "geo_turin": {
+    "message": "Turin",
+    "description": "Name of the city in Italy."
   },
   "geo_warsaw": {
     "message": "Warsaw",
@@ -823,7 +883,6 @@
     "message": "These steps will help you install Outline on a Linux server.",
     "description": "This string appears in the server setup view as a header when no specific cloud provider is selected. Lets the user know that the following sections provide instructions on how to install Outline on their server."
   },
-
   "manual_server_firewall": {
     "message": "Configure your firewall",
     "description": "This string appears in the server setup view as the header of a section that provides instructions to configure the server's firewall."
