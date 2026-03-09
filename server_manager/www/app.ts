@@ -19,7 +19,7 @@ import * as Sentry from '@sentry/electron/renderer';
 import * as semver from 'semver';
 
 import {DisplayDataAmount, displayDataAmountToBytes} from './data_formatting';
-import {filterOptions, getShortName} from './location_formatting';
+import {filterOptions, getShortName, sortOptions} from './location_formatting';
 import {parseManualServerConfig} from './management_urls';
 import type {AppRoot, ServerListEntry} from './ui_components/app-root';
 import {FeedbackDetail} from './ui_components/outline-feedback-dialog';
@@ -286,7 +286,7 @@ export class App {
       let isValid = true;
       try {
         parseManualServerConfig(event.detail.userInput);
-      } catch (e) {
+      } catch {
         isValid = false;
       }
       const manualServerEntryEl = appRoot.getManualServerEntry();
@@ -849,7 +849,11 @@ export class App {
       const map = await this.digitalOceanRetry(() => {
         return this.digitalOceanAccount.listLocations();
       });
-      regionPicker.options = filterOptions(map);
+      regionPicker.options = sortOptions(
+        filterOptions(map),
+        this.appRoot.localize as (id: string) => string,
+        this.appRoot.language
+      );
     } catch (e) {
       console.error(`Failed to get list of available regions: ${e}`);
       this.appRoot.showError(this.appRoot.localize('error-do-regions'));
@@ -1601,7 +1605,7 @@ export class App {
       await this.appRoot.setLanguage(languageCode, languageDir);
       document.documentElement.setAttribute('dir', languageDir);
       window.localStorage.setItem('overrideLanguage', languageCode);
-    } catch (error) {
+    } catch {
       this.appRoot.showError(this.appRoot.localize('error-unexpected'));
     }
   }

@@ -18,6 +18,21 @@ import {
   GeoLocation,
 } from '../model/location';
 
+function formatGeoId(geoId: string): string {
+  return geoId
+    .split('-')
+    .map(part => {
+      if (!part) {
+        return '';
+      }
+      if (part === part.toUpperCase()) {
+        return part;
+      }
+      return `${part[0].toUpperCase()}${part.slice(1)}`;
+    })
+    .join(' ');
+}
+
 /**
  * Returns the localized place name, or the data center ID if the location is
  * unknown.
@@ -32,7 +47,12 @@ export function getShortName(
   if (!cloudLocation.location) {
     return cloudLocation.id;
   }
-  return localize(`geo-${cloudLocation.location.id.toLowerCase()}`);
+  const msgId = `geo-${cloudLocation.location.id.toLowerCase()}`;
+  const localized = localize(msgId);
+  if (localized && localized !== msgId) {
+    return localized;
+  }
+  return formatGeoId(cloudLocation.location.id);
 }
 
 /**
@@ -52,6 +72,76 @@ export function localizeCountry(
     type: 'region',
   });
   return displayName.of(geoLocation.countryCode);
+}
+
+type SortKey = {
+  available: boolean;
+  hasKnownLocation: boolean;
+  country: string;
+  shortName: string;
+  id: string;
+};
+
+function getSortKey<T extends CloudLocationOption>(
+  option: T,
+  localize: (id: string) => string,
+  language: string
+): SortKey {
+  const geoLocation = option.cloudLocation.location;
+  let country = '';
+  if (geoLocation) {
+    try {
+      country = localizeCountry(geoLocation, language);
+    } catch {
+      country = geoLocation.countryCode;
+    }
+  }
+
+  return {
+    available: option.available,
+    hasKnownLocation: !!geoLocation,
+    country,
+    shortName: getShortName(option.cloudLocation, localize),
+    id: option.cloudLocation.id,
+  };
+}
+
+/**
+ * Returns options sorted for display:
+ * - available locations first
+ * - known locations before unknown fallback IDs
+ * - then by localized country and city names
+ */
+export function sortOptions<T extends CloudLocationOption>(
+  options: readonly T[],
+  localize: (id: string) => string,
+  language: string
+): T[] {
+  const collator = new Intl.Collator([language], {
+    sensitivity: 'base',
+    numeric: true,
+  });
+
+  return [...options]
+    .map(option => ({option, key: getSortKey(option, localize, language)}))
+    .sort((a, b) => {
+      if (a.key.available !== b.key.available) {
+        return a.key.available ? -1 : 1;
+      }
+      if (a.key.hasKnownLocation !== b.key.hasKnownLocation) {
+        return a.key.hasKnownLocation ? -1 : 1;
+      }
+      const countryCmp = collator.compare(a.key.country, b.key.country);
+      if (countryCmp !== 0) {
+        return countryCmp;
+      }
+      const shortNameCmp = collator.compare(a.key.shortName, b.key.shortName);
+      if (shortNameCmp !== 0) {
+        return shortNameCmp;
+      }
+      return collator.compare(a.key.id, b.key.id);
+    })
+    .map(({option}) => option);
 }
 
 /**
