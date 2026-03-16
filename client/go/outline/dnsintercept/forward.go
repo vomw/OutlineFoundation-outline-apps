@@ -56,10 +56,11 @@ type forwardPacketReqSender struct {
 // transport session immediately rather than waiting for the idle timeout.
 type forwardPacketRespReceiver struct {
 	network.PacketResponseReceiver
-	fpp    *forwardPacketProxy
-	once   sync.Once                   // ensures the session is closed at most once
-	mu     sync.Mutex                  // protects sender
-	sender network.PacketRequestSender // the request sender to close after first DNS response
+	fpp          *forwardPacketProxy
+	once         sync.Once                   // ensures the session is closed at most once
+	mu           sync.Mutex                  // protects sender and pendingClose
+	sender       network.PacketRequestSender // the request sender to close after first DNS response
+	pendingClose bool                        // true if WriteFrom fired before sender was set
 }
 
 var _ network.PacketProxy = (*forwardPacketProxy)(nil)
@@ -86,7 +87,11 @@ func (fpp *forwardPacketProxy) NewSession(resp network.PacketResponseReceiver) (
 	}
 	wrapper.mu.Lock()
 	wrapper.sender = base
+	pending := wrapper.pendingClose
 	wrapper.mu.Unlock()
+	if pending {
+		base.Close()
+	}
 	return &forwardPacketReqSender{base, fpp}, nil
 }
 
@@ -111,6 +116,9 @@ func (resp *forwardPacketRespReceiver) WriteFrom(p []byte, source net.Addr) (int
 		resp.once.Do(func() {
 			resp.mu.Lock()
 			s := resp.sender
+			if s == nil {
+				resp.pendingClose = true
+			}
 			resp.mu.Unlock()
 			if s != nil {
 				s.Close()
