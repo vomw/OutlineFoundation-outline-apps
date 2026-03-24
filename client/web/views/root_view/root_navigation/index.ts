@@ -259,9 +259,7 @@ export class RootNavigation extends LitElement {
         </md-list>
         <ul>
           <li>
-            <a
-              href="https://getoutline.org/policies/privacy"
-            >
+            <a href="https://getoutline.org/policies/privacy">
               ${this.localize('privacy')}
               <md-icon id="open-in-new-icon">open_in_new</md-icon>
             </a>
@@ -273,9 +271,7 @@ export class RootNavigation extends LitElement {
             </a>
           </li>
           <li>
-            <a
-              href="https://getoutline.org/policies/terms-of-service"
-            >
+            <a href="https://getoutline.org/policies/terms-of-service">
               ${this.localize('terms')}
               <md-icon id="open-in-new-icon">open_in_new</md-icon>
             </a>

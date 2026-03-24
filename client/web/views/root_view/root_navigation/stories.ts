@@ -23,8 +23,7 @@ export default {
   component: 'root-navigation',
   args: {
     open: true,
-    dataCollectionPageUrl:
-      'https://getoutline.org/policies/data-collection',
+    dataCollectionPageUrl: 'https://getoutline.org/policies/data-collection',
   },
 };
 
