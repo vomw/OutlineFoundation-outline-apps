@@ -11,8 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import {merge} from 'webpack-merge';
 import webpack from 'webpack';
+import {merge} from 'webpack-merge';
+
 import {baseConfig, TS_LOADER} from './webpack_base.mjs';
 
 export default merge(baseConfig, {
