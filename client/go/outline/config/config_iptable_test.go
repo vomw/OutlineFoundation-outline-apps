@@ -25,6 +25,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type errorStreamDialer struct {
+	name string
+}
+
+func (d *errorStreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+	return nil, fmt.Errorf("dialer '%s' called for address '%s'", d.name, addr)
+}
+
 func TestParseIPTableStreamDialer(t *testing.T) {
 	ctx := context.Background()
 

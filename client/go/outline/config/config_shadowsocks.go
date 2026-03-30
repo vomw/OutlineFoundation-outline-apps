@@ -48,13 +48,13 @@ type LegacyShadowsocksConfig struct {
 
 func NewShadowsocksStreamDialerSubParser(parseSE configyaml.ParseFunc[*Endpoint[transport.StreamConn]]) func(ctx context.Context, input map[string]any) (*Dialer[transport.StreamConn], error) {
 	return func(ctx context.Context, input map[string]any) (*Dialer[transport.StreamConn], error) {
-		return parseShadowsocksStreamDialer(ctx, input, parseSE)
+		return ParseShadowsocksStreamDialer(ctx, input, parseSE)
 	}
 }
 
 func NewShadowsocksPacketDialerSubParser(parsePE configyaml.ParseFunc[*Endpoint[net.Conn]]) func(ctx context.Context, input map[string]any) (*Dialer[net.Conn], error) {
 	return func(ctx context.Context, input map[string]any) (*Dialer[net.Conn], error) {
-		return parseShadowsocksPacketDialer(ctx, input, parsePE)
+		return ParseShadowsocksPacketDialer(ctx, input, parsePE)
 	}
 }
 
@@ -64,7 +64,7 @@ func NewShadowsocksPacketListenerSubParser(parsePE configyaml.ParseFunc[*Endpoin
 	}
 }
 
-func parseShadowsocksTransport(ctx context.Context, config configyaml.ConfigNode, parseSE configyaml.ParseFunc[*Endpoint[transport.StreamConn]], parsePE configyaml.ParseFunc[*Endpoint[net.Conn]]) (*TransportPair, error) {
+func ParseShadowsocksTransport(ctx context.Context, config configyaml.ConfigNode, parseSE configyaml.ParseFunc[*Endpoint[transport.StreamConn]], parsePE configyaml.ParseFunc[*Endpoint[net.Conn]]) (*TransportPair, error) {
 	params, err := parseShadowsocksParams(config)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func parseShadowsocksTransport(ctx context.Context, config configyaml.ConfigNode
 	)
 }
 
-func parseShadowsocksStreamDialer(ctx context.Context, config configyaml.ConfigNode, parseSE configyaml.ParseFunc[*Endpoint[transport.StreamConn]]) (*Dialer[transport.StreamConn], error) {
+func ParseShadowsocksStreamDialer(ctx context.Context, config configyaml.ConfigNode, parseSE configyaml.ParseFunc[*Endpoint[transport.StreamConn]]) (*Dialer[transport.StreamConn], error) {
 	params, err := parseShadowsocksParams(config)
 	if err != nil {
 		return nil, err
@@ -120,7 +120,7 @@ func parseShadowsocksStreamDialer(ctx context.Context, config configyaml.ConfigN
 	return &Dialer[transport.StreamConn]{ConnectionProviderInfo{ConnTypeTunneled, se.FirstHop}, sd.DialStream}, nil
 }
 
-func parseShadowsocksPacketDialer(ctx context.Context, config configyaml.ConfigNode, parsePE configyaml.ParseFunc[*Endpoint[net.Conn]]) (*Dialer[net.Conn], error) {
+func ParseShadowsocksPacketDialer(ctx context.Context, config configyaml.ConfigNode, parsePE configyaml.ParseFunc[*Endpoint[net.Conn]]) (*Dialer[net.Conn], error) {
 	pl, err := parseShadowsocksPacketListener(ctx, config, parsePE)
 	if err != nil {
 		return nil, err

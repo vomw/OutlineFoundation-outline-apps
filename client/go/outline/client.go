@@ -25,6 +25,7 @@ import (
 
 	"localhost/client/go/configyaml"
 	"localhost/client/go/outline/config"
+	"localhost/client/go/outline/registry"
 	"localhost/client/go/outline/platerrors"
 	"localhost/client/go/outline/reporting"
 	"golang.getoutline.org/sdk/network"
@@ -116,7 +117,7 @@ func (c *ClientConfig) new(keyID string, providerClientConfigText string) (*Clie
 	if clientConfig.TransportParser == nil {
 		tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{KeepAlive: -1}}
 		udpDialer := &transport.UDPDialer{}
-		clientConfig.TransportParser = config.NewDefaultTransportProvider(tcpDialer, udpDialer)
+		clientConfig.TransportParser = registry.NewDefaultTransportProvider(tcpDialer, udpDialer)
 	}
 	if clientConfig.DataDir == "" {
 		if runtime.GOOS != "android" && runtime.GOOS != "ios" {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package registry
 
 import (
 	"context"
@@ -21,11 +21,12 @@ import (
 	"testing"
 
 	"localhost/client/go/configyaml"
+	"localhost/client/go/outline/config"
 	"golang.getoutline.org/sdk/transport"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestTransportProvider() *configyaml.TypeParser[*TransportPair] {
+func newTestTransportProvider() *configyaml.TypeParser[*config.TransportPair] {
 	tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{KeepAlive: -1}}
 	udpDialer := &transport.UDPDialer{}
 	return NewDefaultTransportProvider(tcpDialer, udpDialer)
@@ -50,9 +51,9 @@ udp: *shared`)
 	require.NotNil(t, d.StreamDialer)
 	require.NotNil(t, d.PacketProxy)
 	require.Equal(t, "example.com:1234", d.StreamDialer.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.StreamDialer.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.StreamDialer.ConnType)
 	require.Equal(t, "example.com:1234", d.PacketProxy.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.PacketProxy.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.PacketProxy.ConnType)
 }
 
 func TestRegisterParseURL(t *testing.T) {
@@ -67,9 +68,9 @@ func TestRegisterParseURL(t *testing.T) {
 	require.NotNil(t, d.StreamDialer)
 	require.NotNil(t, d.PacketProxy)
 	require.Equal(t, "example.com:4321", d.StreamDialer.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.StreamDialer.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.StreamDialer.ConnType)
 	require.Equal(t, "example.com:4321", d.PacketProxy.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.PacketProxy.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.PacketProxy.ConnType)
 }
 
 func TestRegisterParseURLInQuotes(t *testing.T) {
@@ -84,9 +85,9 @@ func TestRegisterParseURLInQuotes(t *testing.T) {
 	require.NotNil(t, d.StreamDialer)
 	require.NotNil(t, d.PacketProxy)
 	require.Equal(t, "example.com:4321", d.StreamDialer.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.StreamDialer.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.StreamDialer.ConnType)
 	require.Equal(t, "example.com:4321", d.PacketProxy.FirstHop)
-	require.Equal(t, ConnTypeTunneled, d.PacketProxy.ConnType)
+	require.Equal(t, config.ConnTypeTunneled, d.PacketProxy.ConnType)
 }
 
 type errorStreamDialer struct {
@@ -155,7 +156,7 @@ udp: null`)
 		require.NoError(t, err)
 		require.NotNil(t, transportPair)
 		require.NotNil(t, transportPair.StreamDialer)
-		require.Equal(t, ConnTypeDirect, transportPair.StreamDialer.ConnType)
+		require.Equal(t, config.ConnTypeDirect, transportPair.StreamDialer.ConnType)
 	})
 
 	t.Run("block", func(t *testing.T) {
@@ -170,7 +171,7 @@ udp: null`)
 		require.NoError(t, err)
 		require.NotNil(t, transportPair)
 		require.NotNil(t, transportPair.StreamDialer)
-		require.Equal(t, ConnTypeBlocked, transportPair.StreamDialer.ConnType)
+		require.Equal(t, config.ConnTypeBlocked, transportPair.StreamDialer.ConnType)
 
 		_, err = transportPair.StreamDialer.Dial(ctx, "example.com:123")
 		require.Error(t, err)

@@ -34,11 +34,11 @@ type DialEndpointConfig struct {
 
 func NewDialEndpointSubParser[ConnType any](parse configyaml.ParseFunc[*Dialer[ConnType]]) func(ctx context.Context, input map[string]any) (*Endpoint[ConnType], error) {
 	return func(ctx context.Context, input map[string]any) (*Endpoint[ConnType], error) {
-		return parseDirectDialerEndpoint(ctx, input, parse)
+		return ParseDirectDialerEndpoint(ctx, input, parse)
 	}
 }
 
-func parseDirectDialerEndpoint[ConnType any](ctx context.Context, config any, newDialer configyaml.ParseFunc[*Dialer[ConnType]]) (*Endpoint[ConnType], error) {
+func ParseDirectDialerEndpoint[ConnType any](ctx context.Context, config any, newDialer configyaml.ParseFunc[*Dialer[ConnType]]) (*Endpoint[ConnType], error) {
 	if config == nil {
 		return nil, errors.New("endpoint config cannot be nil")
 	}

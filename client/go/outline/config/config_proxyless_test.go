@@ -12,15 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package config_test
 
 import (
 	"context"
 	"testing"
 
 	"localhost/client/go/configyaml"
+	"localhost/client/go/outline/config"
+	"localhost/client/go/outline/registry"
+	"golang.getoutline.org/sdk/transport"
+	"net"
 	"github.com/stretchr/testify/require"
 )
+
+func newTestTransportProvider() *configyaml.TypeParser[*config.TransportPair] {
+	tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{KeepAlive: -1}}
+	udpDialer := &transport.UDPDialer{}
+	return registry.NewDefaultTransportProvider(tcpDialer, udpDialer)
+}
 
 func TestParseProxyless(t *testing.T) {
 	provider := newTestTransportProvider()
@@ -33,6 +43,6 @@ func TestParseProxyless(t *testing.T) {
 	require.NotNil(t, transportPair)
 	require.NotNil(t, transportPair.StreamDialer)
 	require.NotNil(t, transportPair.PacketProxy)
-	require.Equal(t, ConnTypeDirect, transportPair.StreamDialer.ConnType)
-	require.Equal(t, ConnTypeDirect, transportPair.PacketProxy.ConnType)
+	require.Equal(t, config.ConnTypeDirect, transportPair.StreamDialer.ConnType)
+	require.Equal(t, config.ConnTypeDirect, transportPair.PacketProxy.ConnType)
 }

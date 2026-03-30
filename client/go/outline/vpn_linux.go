@@ -23,7 +23,8 @@ import (
 	"sync"
 
 	"localhost/client/go/outline/callback"
-	"localhost/client/go/outline/config"
+
+	"localhost/client/go/outline/registry"
 	perrs "localhost/client/go/outline/platerrors"
 	"localhost/client/go/outline/vpn"
 )
@@ -63,7 +64,7 @@ func (api *vpnAPI) Establish(configStr string) (err error) {
 	clientConfig := ClientConfig{}
 	tcp := newFWMarkProtectedTCPDialer(conf.VPN.ProtectionMark)
 	udp := newFWMarkProtectedUDPDialer(conf.VPN.ProtectionMark)
-	clientConfig.TransportParser = config.NewDefaultTransportProvider(tcp, udp)
+	clientConfig.TransportParser = registry.NewDefaultTransportProvider(tcp, udp)
 	result := clientConfig.New(conf.VPN.ID, conf.Client)
 	if result.Error != nil {
 		return result.Error

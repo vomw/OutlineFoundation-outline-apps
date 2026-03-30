@@ -160,7 +160,7 @@ func TestParseShadowsocksConfig_YAML(t *testing.T) {
 			"secret":   "SECRET/!@#",
 			"prefix":   "outline-123",
 		}
-		transport, err := parseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
+		transport, err := ParseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
 		require.NoError(t, err)
 		require.NotNil(t, transport)
 	})
@@ -172,7 +172,7 @@ func TestParseShadowsocksConfig_YAML(t *testing.T) {
 			"secret":   "SECRET/!@#",
 			"prefix":   "outline-123",
 		}
-		_, err := parseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
+		_, err := ParseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
 		require.Error(t, err)
 	})
 
@@ -184,7 +184,7 @@ func TestParseShadowsocksConfig_YAML(t *testing.T) {
 			"prefix":   "outline-123",
 			"extra":    "NOT SUPPORTED",
 		}
-		_, err := parseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
+		_, err := ParseShadowsocksTransport(context.Background(), config, streamEndpoints.Parse, packetEndpoints.Parse)
 		require.Error(t, err)
 	})
 
