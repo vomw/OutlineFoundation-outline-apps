@@ -13,7 +13,7 @@
 // limitations under the License.
 import webpack from 'webpack';
 import {merge} from 'webpack-merge';
-import webpack from 'webpack';
+
 import {baseConfig, TS_LOADER} from './webpack_base.mjs';
 
 export default merge(baseConfig, {
@@ -23,7 +23,7 @@ export default merge(baseConfig, {
     // scheme as a normal module and fails compilation with "Can't resolve 'data:text'".
     //
     // We don't execute this code path in our current unit tests unless snapshot plugins
-    // are used, so it's safe to ignore the `data:` specifier at bundle time.
+    // are used, so it's safe to ignore the `data:` specifier at bundle time
     new webpack.IgnorePlugin({resourceRegExp: /^data:/}),
   ],
   module: {
