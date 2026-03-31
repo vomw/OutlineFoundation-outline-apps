@@ -254,16 +254,44 @@ function generate_secret_key() {
 }
 
 function generate_certificate() {
-  # Generate self-signed cert and store it in the persistent state directory.
+  # Generate a CA-signed certificate with SAN for the management API.
   local -r CERTIFICATE_NAME="${STATE_DIR}/shadowbox-selfsigned"
   readonly SB_CERTIFICATE_FILE="${CERTIFICATE_NAME}.crt"
   readonly SB_PRIVATE_KEY_FILE="${CERTIFICATE_NAME}.key"
-  declare -a openssl_req_flags=(
-    -x509 -nodes -days 36500 -newkey rsa:4096
-    -subj "/CN=${PUBLIC_HOSTNAME}"
-    -keyout "${SB_PRIVATE_KEY_FILE}" -out "${SB_CERTIFICATE_FILE}"
-  )
-  openssl req "${openssl_req_flags[@]}" >&2
+  local -r CA_NAME="${STATE_DIR}/shadowbox-ca"
+  readonly SB_CA_CERTIFICATE_FILE="${CA_NAME}.crt"
+  local -r SB_CA_KEY_FILE="${CA_NAME}.key"
+
+  # Determine the SAN type: IP addresses use "IP:", domain names use "DNS:".
+  # Always include 127.0.0.1 for local health checks.
+  local san_value
+  if [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
+     [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9a-fA-F:]+:[0-9a-fA-F:]*$ ]]; then
+    san_value="IP:${PUBLIC_HOSTNAME},IP:127.0.0.1"
+  else
+    san_value="DNS:${PUBLIC_HOSTNAME},IP:127.0.0.1"
+  fi
+
+  # Generate a CA private key and self-signed CA certificate.
+  openssl req -x509 -nodes -days 36500 -newkey rsa:4096 \
+    -subj "/CN=Outline CA" \
+    -keyout "${SB_CA_KEY_FILE}" -out "${SB_CA_CERTIFICATE_FILE}" >&2
+
+  # Generate the server private key and a certificate signing request (CSR).
+  openssl req -nodes -newkey rsa:4096 \
+    -subj "/CN=${PUBLIC_HOSTNAME}" \
+    -keyout "${SB_PRIVATE_KEY_FILE}" \
+    -out "${STATE_DIR}/shadowbox.csr" >&2
+
+  # Sign the server CSR with the CA, including the subjectAltName extension.
+  openssl x509 -req -days 36500 \
+    -in "${STATE_DIR}/shadowbox.csr" \
+    -CA "${SB_CA_CERTIFICATE_FILE}" -CAkey "${SB_CA_KEY_FILE}" -CAcreateserial \
+    -extfile <(printf "subjectAltName=%s" "${san_value}") \
+    -out "${SB_CERTIFICATE_FILE}" >&2
+
+  # Clean up temporary files.
+  rm -f "${STATE_DIR}/shadowbox.csr" "${STATE_DIR}/shadowbox-ca.srl"
 }
 
 function generate_certificate_fingerprint() {
@@ -379,13 +407,11 @@ function start_watchtower() {
 
 # Waits for the service to be up and healthy
 function wait_shadowbox() {
-  # We use insecure connection because our threat model doesn't include localhost port
-  # interception and our certificate doesn't have localhost as a subject alternative name
-  until fetch --insecure "${LOCAL_API_URL}/access-keys" >/dev/null; do sleep 1; done
+  until fetch --cacert "${SB_CA_CERTIFICATE_FILE}" "${LOCAL_API_URL}/access-keys" >/dev/null; do sleep 1; done
 }
 
 function create_first_user() {
-  fetch --insecure --request POST "${LOCAL_API_URL}/access-keys" >&2
+  fetch --cacert "${SB_CA_CERTIFICATE_FILE}" --request POST "${LOCAL_API_URL}/access-keys" >&2
 }
 
 function output_config() {
@@ -399,14 +425,14 @@ function add_api_url_to_config() {
 function check_firewall() {
   # TODO(JonathanDCohen) This is incorrect if access keys are using more than one port.
   local -i ACCESS_KEY_PORT
-  ACCESS_KEY_PORT=$(fetch --insecure "${LOCAL_API_URL}/access-keys" |
+  ACCESS_KEY_PORT=$(fetch --cacert "${SB_CA_CERTIFICATE_FILE}" "${LOCAL_API_URL}/access-keys" |
       docker exec -i "${CONTAINER_NAME}" node -e '
           const fs = require("fs");
           const accessKeys = JSON.parse(fs.readFileSync(0, {encoding: "utf-8"}));
           console.log(accessKeys["accessKeys"][0]["port"]);
       ') || return
   readonly ACCESS_KEY_PORT
-  if ! fetch --max-time 5 --cacert "${SB_CERTIFICATE_FILE}" "${PUBLIC_API_URL}/access-keys" >/dev/null; then
+  if ! fetch --max-time 5 --cacert "${SB_CA_CERTIFICATE_FILE}" "${PUBLIC_API_URL}/access-keys" >/dev/null; then
      log_error "BLOCKED"
      FIREWALL_STATUS="\
 You won’t be able to access it externally, despite your server being correctly
