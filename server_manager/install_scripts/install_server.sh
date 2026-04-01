@@ -43,11 +43,15 @@ set -euo pipefail
 
 function display_usage() {
   cat <<EOF
-Usage: install_server.sh [--hostname <hostname>] [--api-port <port>] [--keys-port <port>]
+Usage: install_server.sh [--hostname <hostname>] [--api-port <port>] [--keys-port <port>] --acme-email <email>
 
-  --hostname   The hostname to be used to access the management API and access keys
-  --api-port   The port number for the management API
-  --keys-port  The port number for the access keys
+  --hostname    The hostname to be used to access the management API and access keys
+  --api-port    The port number for the management API
+  --keys-port   The port number for the access keys
+  --acme-email  Email address for ACME certificate registration (required).
+                Used for renewal notifications. Port 80 must be reachable for
+                certificate issuance. IP addresses use ZeroSSL; domain names use
+                Let's Encrypt.
 EOF
 }
 
@@ -253,57 +257,42 @@ function generate_secret_key() {
   readonly SB_API_PREFIX
 }
 
-function generate_certificate() {
-  # Generate a CA-signed certificate with SAN for the management API.
-  local -r CERTIFICATE_NAME="${STATE_DIR}/shadowbox-selfsigned"
-  readonly SB_CERTIFICATE_FILE="${CERTIFICATE_NAME}.crt"
-  readonly SB_PRIVATE_KEY_FILE="${CERTIFICATE_NAME}.key"
-  local -r CA_NAME="${STATE_DIR}/shadowbox-ca"
-  readonly SB_CA_CERTIFICATE_FILE="${CA_NAME}.crt"
-  local -r SB_CA_KEY_FILE="${CA_NAME}.key"
-
-  # Determine the SAN type: IP addresses use "IP:", domain names use "DNS:".
-  # Always include 127.0.0.1 for local health checks.
-  local san_value
-  if [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
-     [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9a-fA-F:]+:[0-9a-fA-F:]*$ ]]; then
-    san_value="IP:${PUBLIC_HOSTNAME},IP:127.0.0.1"
-  else
-    san_value="DNS:${PUBLIC_HOSTNAME},IP:127.0.0.1"
-  fi
-
-  # Generate a CA private key and self-signed CA certificate.
-  openssl req -x509 -nodes -days 36500 -newkey rsa:4096 \
-    -subj "/CN=Outline CA" \
-    -keyout "${SB_CA_KEY_FILE}" -out "${SB_CA_CERTIFICATE_FILE}" >&2
-
-  # Generate the server private key and a certificate signing request (CSR).
-  openssl req -nodes -newkey rsa:4096 \
-    -subj "/CN=${PUBLIC_HOSTNAME}" \
-    -keyout "${SB_PRIVATE_KEY_FILE}" \
-    -out "${STATE_DIR}/shadowbox.csr" >&2
-
-  # Sign the server CSR with the CA, including the subjectAltName extension.
-  openssl x509 -req -days 36500 \
-    -in "${STATE_DIR}/shadowbox.csr" \
-    -CA "${SB_CA_CERTIFICATE_FILE}" -CAkey "${SB_CA_KEY_FILE}" -CAcreateserial \
-    -extfile <(printf "subjectAltName=%s" "${san_value}") \
-    -out "${SB_CERTIFICATE_FILE}" >&2
-
-  # Clean up temporary files.
-  rm -f "${STATE_DIR}/shadowbox.csr" "${STATE_DIR}/shadowbox-ca.srl"
+function install_acme() {
+  # Install acme.sh, which handles ACME certificate issuance and renewal.
+  # See https://github.com/acmesh-official/acme.sh
+  curl -sSL https://get.acme.sh | sh -s "email=${ACME_EMAIL}" >&2
 }
 
-function generate_certificate_fingerprint() {
-  # Add a tag with the SHA-256 fingerprint of the certificate.
-  # (Electron uses SHA-256 fingerprints: https://github.com/electron/electron/blob/9624bc140353b3771bd07c55371f6db65fd1b67e/atom/common/native_mate_converters/net_converter.cc#L60)
-  # Example format: "SHA256 Fingerprint=BD:DB:C9:A4:39:5C:B3:4E:6E:CF:18:43:61:9F:07:A2:09:07:37:35:63:67"
-  local CERT_OPENSSL_FINGERPRINT
-  CERT_OPENSSL_FINGERPRINT="$(openssl x509 -in "${SB_CERTIFICATE_FILE}" -noout -sha256 -fingerprint)" || return
-  # Example format: "BDDBC9A4395CB34E6ECF1843619F07A2090737356367"
-  local CERT_HEX_FINGERPRINT
-  CERT_HEX_FINGERPRINT="$(echo "${CERT_OPENSSL_FINGERPRINT#*=}" | tr -d :)" || return
-  output_config "certSha256:${CERT_HEX_FINGERPRINT}"
+function issue_certificate() {
+  # Issue a TLS certificate from a trusted CA using the ACME HTTP-01 challenge.
+  # Port 80 must be reachable from the internet for challenge validation.
+  #
+  # IP addresses use ZeroSSL (the only major ACME CA that issues IP certificates).
+  # Domain names use Let's Encrypt.
+  local -r CERT_DIR="${STATE_DIR}/certs"
+  mkdir -p "${CERT_DIR}"
+  readonly SB_CERTIFICATE_FILE="${CERT_DIR}/shadowbox.crt"
+  readonly SB_PRIVATE_KEY_FILE="${CERT_DIR}/shadowbox.key"
+
+  local -a acme_server_flags=()
+  if [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
+     [[ "${PUBLIC_HOSTNAME}" =~ ^[0-9a-fA-F:]+:[0-9a-fA-F:]*$ ]]; then
+    # ZeroSSL is the only major ACME CA that issues certificates for bare IP addresses.
+    acme_server_flags=(--server zerossl)
+  fi
+
+  ~/.acme.sh/acme.sh --issue \
+    --standalone \
+    "${acme_server_flags[@]}" \
+    -d "${PUBLIC_HOSTNAME}" >&2
+
+  # Copy the issued certificate to the state directory and register a reload
+  # command so acme.sh restarts Shadowbox automatically after each renewal.
+  ~/.acme.sh/acme.sh --install-cert \
+    -d "${PUBLIC_HOSTNAME}" \
+    --cert-file "${SB_CERTIFICATE_FILE}" \
+    --key-file "${SB_PRIVATE_KEY_FILE}" \
+    --reloadcmd "docker restart ${CONTAINER_NAME}" >&2
 }
 
 function join() {
@@ -407,11 +396,13 @@ function start_watchtower() {
 
 # Waits for the service to be up and healthy
 function wait_shadowbox() {
-  until fetch --cacert "${SB_CA_CERTIFICATE_FILE}" "${LOCAL_API_URL}/access-keys" >/dev/null; do sleep 1; done
+  # --insecure is used because our threat model doesn't include localhost port
+  # interception, and the ACME certificate is only valid for PUBLIC_HOSTNAME.
+  until fetch --insecure "${LOCAL_API_URL}/access-keys" >/dev/null; do sleep 1; done
 }
 
 function create_first_user() {
-  fetch --cacert "${SB_CA_CERTIFICATE_FILE}" --request POST "${LOCAL_API_URL}/access-keys" >&2
+  fetch --insecure --request POST "${LOCAL_API_URL}/access-keys" >&2
 }
 
 function output_config() {
@@ -425,14 +416,14 @@ function add_api_url_to_config() {
 function check_firewall() {
   # TODO(JonathanDCohen) This is incorrect if access keys are using more than one port.
   local -i ACCESS_KEY_PORT
-  ACCESS_KEY_PORT=$(fetch --cacert "${SB_CA_CERTIFICATE_FILE}" "${LOCAL_API_URL}/access-keys" |
+  ACCESS_KEY_PORT=$(fetch --insecure "${LOCAL_API_URL}/access-keys" |
       docker exec -i "${CONTAINER_NAME}" node -e '
           const fs = require("fs");
           const accessKeys = JSON.parse(fs.readFileSync(0, {encoding: "utf-8"}));
           console.log(accessKeys["accessKeys"][0]["port"]);
       ') || return
   readonly ACCESS_KEY_PORT
-  if ! fetch --max-time 5 --cacert "${SB_CA_CERTIFICATE_FILE}" "${PUBLIC_API_URL}/access-keys" >/dev/null; then
+  if ! fetch --max-time 5 "${PUBLIC_API_URL}/access-keys" >/dev/null; then
      log_error "BLOCKED"
      FIREWALL_STATUS="\
 You won’t be able to access it externally, despite your server being correctly
@@ -512,17 +503,28 @@ install_shadowbox() {
     cp "${ACCESS_CONFIG}" "${ACCESS_CONFIG}.bak" && true > "${ACCESS_CONFIG}"
   fi
 
+  # ACME_EMAIL may be set via environment variable or --acme-email flag.
+  readonly ACME_EMAIL="${FLAGS_ACME_EMAIL:-${ACME_EMAIL:-}}"
+  if [[ -z "${ACME_EMAIL}" ]]; then
+    log_error "--acme-email is required for ACME certificate issuance" >&2
+    display_usage >&2
+    exit 1
+  fi
+
   # Make a directory for persistent state
   run_step "Creating persistent state dir" create_persisted_state_dir
   run_step "Generating secret key" generate_secret_key
-  run_step "Generating TLS certificate" generate_certificate
-  run_step "Generating SHA-256 certificate fingerprint" generate_certificate_fingerprint
   run_step "Writing config" write_config
 
   # TODO(dborkan): if the script fails after docker run, it will continue to fail
   # as the names shadowbox and watchtower will already be in use.  Consider
   # deleting the container in the case of failure (e.g. using a trap, or
   # deleting existing containers on each run).
+  # Install acme.sh and issue the TLS certificate before starting Shadowbox,
+  # so port 80 is available for the HTTP-01 ACME challenge.
+  run_step "Installing ACME certificate manager" install_acme
+  run_step "Issuing TLS certificate" issue_certificate
+
   run_step "Starting Shadowbox" start_shadowbox
   # TODO(fortuna): Don't wait for Shadowbox to run this.
   run_step "Starting Watchtower" start_watchtower
@@ -537,15 +539,14 @@ install_shadowbox() {
   run_step "Checking host firewall" check_firewall
 
   # Echos the value of the specified field from ACCESS_CONFIG.
-  # e.g. if ACCESS_CONFIG contains the line "certSha256:1234",
-  # calling $(get_field_value certSha256) will echo 1234.
+  # e.g. if ACCESS_CONFIG contains the line "apiUrl:...",
+  # calling $(get_field_value apiUrl) will echo the URL.
   function get_field_value {
     grep "$1" "${ACCESS_CONFIG}" | sed "s/$1://"
   }
 
-  # Output JSON.  This relies on apiUrl and certSha256 (hex characters) requiring
-  # no string escaping.  TODO: look for a way to generate JSON that doesn't
-  # require new dependencies.
+  # Output JSON.  This relies on apiUrl requiring no string escaping.
+  # TODO: look for a way to generate JSON that doesn't require new dependencies.
   cat <<END_OF_SERVER_OUTPUT
 
 CONGRATULATIONS! Your Outline server is up and running.
@@ -553,7 +554,7 @@ CONGRATULATIONS! Your Outline server is up and running.
 To manage your Outline server, please copy the following line (including curly
 brackets) into Step 2 of the Outline Manager interface:
 
-$(echo -e "\033[1;32m{\"apiUrl\":\"$(get_field_value apiUrl)\",\"certSha256\":\"$(get_field_value certSha256)\"}\033[0m")
+$(echo -e "\033[1;32m{\"apiUrl\":\"$(get_field_value apiUrl)\"}\033[0m")
 
 ${FIREWALL_STATUS}
 END_OF_SERVER_OUTPUT
@@ -589,7 +590,7 @@ function escape_json_string() {
 
 function parse_flags() {
   local params
-  params="$(getopt --longoptions hostname:,api-port:,keys-port: -n "$0" -- "$0" "$@")"
+  params="$(getopt --longoptions hostname:,api-port:,keys-port:,acme-email: -n "$0" -- "$0" "$@")"
   eval set -- "${params}"
 
   while (( $# > 0 )); do
@@ -616,6 +617,10 @@ function parse_flags() {
           exit 1
         fi
         ;;
+      --acme-email)
+        FLAGS_ACME_EMAIL="$1"
+        shift
+        ;;
       --)
         break
         ;;
@@ -638,6 +643,7 @@ function main() {
   declare FLAGS_HOSTNAME=""
   declare -i FLAGS_API_PORT=0
   declare -i FLAGS_KEYS_PORT=0
+  declare FLAGS_ACME_EMAIL=""
   parse_flags "$@"
   install_shadowbox
 }

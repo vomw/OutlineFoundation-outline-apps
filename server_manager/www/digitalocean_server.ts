@@ -26,8 +26,6 @@ import * as server from '../model/server';
 const KEY_VALUE_TAG = 'kv';
 // The tag that appears at the beginning of installation.
 const INSTALL_STARTED_TAG = 'install-started';
-// The tag key for the manager API certificate fingerprint.
-const CERTIFICATE_FINGERPRINT_TAG = 'certsha256';
 // The tag key for the manager API URL.
 const API_URL_TAG = 'apiurl';
 // The tag which appears if there is an error during installation.
@@ -134,13 +132,11 @@ export class DigitalOceanServer
     } else if (Date.now() - this.startTimestamp >= TIMEOUT_MS) {
       console.error('hit timeout while waiting for installation');
       this.setInstallState(InstallState.FAILED);
-    } else if (this.setApiUrlAndCertificate()) {
-      // API Url and Certificate have been set, so we have successfully
-      // installed the server and can now make API calls.
-      console.info('digitalocean_server: Successfully found API and cert tags');
+    } else if (this.setApiUrl()) {
+      // API URL has been set, so we have successfully installed the server
+      // and can now make API calls.
+      console.info('digitalocean_server: Successfully found API tag');
       this.setInstallState(InstallState.COMPLETED);
-    } else if (tagMap.get(CERTIFICATE_FINGERPRINT_TAG)) {
-      this.setInstallState(InstallState.CERTIFICATE_CREATED);
     } else if (tagMap.get(INSTALL_STARTED_TAG)) {
       this.setInstallState(InstallState.DROPLET_RUNNING);
     } else if (this.dropletInfo?.status === 'active') {
@@ -182,15 +178,10 @@ export class DigitalOceanServer
   }
 
   // Returns true on success, else false.
-  private setApiUrlAndCertificate(): boolean {
+  private setApiUrl(): boolean {
     try {
-      // Attempt to get certificate fingerprint and management api address,
-      // these methods throw exceptions if the fields are unavailable.
-      const certificateFingerprint = this.getCertificateFingerprint();
       const apiAddress = this.getManagementApiAddress();
-      this.setManagementApi(
-        makePathApiClient(apiAddress, certificateFingerprint)
-      );
+      this.setManagementApi(makePathApiClient(apiAddress));
       return true;
     } catch {
       // Install state not yet ready.
@@ -265,17 +256,6 @@ export class DigitalOceanServer
       apiAddress += '/';
     }
     return apiAddress;
-  }
-
-  // Gets the certificate fingerprint in binary, throws an error if
-  // unavailable.
-  private getCertificateFingerprint(): string {
-    const fingerprint = this.getTagMap().get(CERTIFICATE_FINGERPRINT_TAG);
-    if (fingerprint) {
-      return fingerprint;
-    } else {
-      throw new Error('certificate fingerprint unavailable');
-    }
   }
 
   getHost(): DigitalOceanHost {

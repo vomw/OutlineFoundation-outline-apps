@@ -182,20 +182,14 @@ export class GcpServer extends ShadowboxServer implements server.ManagedServer {
   private async pollInstallState(): Promise<void> {
     while (!this.installState.isClosed()) {
       const outlineGuestAttributes = await this.getOutlineGuestAttributes();
-      if (
-        outlineGuestAttributes.has('apiUrl') &&
-        outlineGuestAttributes.has('certSha256')
-      ) {
-        const certSha256 = outlineGuestAttributes.get('certSha256');
+      if (outlineGuestAttributes.has('apiUrl')) {
         const apiUrl = outlineGuestAttributes.get('apiUrl');
-        this.setManagementApi(makePathApiClient(apiUrl, atob(certSha256)));
+        this.setManagementApi(makePathApiClient(apiUrl));
         this.setInstallState(InstallState.COMPLETED);
         break;
       } else if (outlineGuestAttributes.has('install-error')) {
         this.setInstallState(InstallState.FAILED);
         break;
-      } else if (outlineGuestAttributes.has('certSha256')) {
-        this.setInstallState(InstallState.CERTIFICATE_CREATED);
       } else if (outlineGuestAttributes.has('install-started')) {
         this.setInstallState(InstallState.INSTANCE_RUNNING);
       }

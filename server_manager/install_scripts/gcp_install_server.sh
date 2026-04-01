@@ -86,7 +86,7 @@ true > "${ACCESS_CONFIG}"
 function finish {
     INSTALL_SERVER_EXIT_CODE=$?
     log_for_sentry "In EXIT trap, exit code ${INSTALL_SERVER_EXIT_CODE}"
-    if ! ( grep --quiet apiUrl "${ACCESS_CONFIG}" && grep --quiet certSha256 "${ACCESS_CONFIG}" ); then
+    if ! grep --quiet apiUrl "${ACCESS_CONFIG}"; then
       echo "INSTALL_SCRIPT_FAILED: ${INSTALL_SERVER_EXIT_CODE}" | cloud::set_guest_attribute "install-error" "true"
       # Post error report to sentry.
       post_sentry_report
@@ -122,14 +122,6 @@ declare -ir install_pid=$!
 log_for_sentry "Reading tags from ACCESS_CONFIG"
 tail -f "${ACCESS_CONFIG}" "--pid=${install_pid}" | while IFS=: read -r key value; do
   case "${key}" in
-    certSha256)
-      log_for_sentry "Writing certSha256 tag"
-      echo "case certSha256: ${key}/${value}"
-      # The value is hex(fingerprint) and Electron expects base64(fingerprint).
-      hex_fingerprint="${value}"
-      base64_fingerprint="$(echo -n "${hex_fingerprint}" | xxd -revert -p -c 255 | base64)"
-      cloud::set_guest_attribute "${key}" "${base64_fingerprint}"
-      ;;
     apiUrl)
       log_for_sentry "Writing apiUrl tag"
       echo "case apiUrl: ${key}/${value}"

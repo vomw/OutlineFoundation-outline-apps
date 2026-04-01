@@ -162,7 +162,7 @@ true > "${ACCESS_CONFIG}"
 function finish {
   local -ir INSTALL_SERVER_EXIT_CODE=$?
   log_for_sentry "In EXIT trap, exit code ${INSTALL_SERVER_EXIT_CODE}"
-  if ! ( grep --quiet apiUrl "${ACCESS_CONFIG}" && grep --quiet certSha256 "${ACCESS_CONFIG}" ); then
+  if ! grep --quiet apiUrl "${ACCESS_CONFIG}"; then
     echo "INSTALL_SCRIPT_FAILED: ${INSTALL_SERVER_EXIT_CODE}" | cloud::add_kv_tag "install-error"
     # Post error report to sentry.
     post_sentry_report
@@ -179,11 +179,6 @@ declare -ir install_pid=$!
 log_for_sentry "Reading tags from ACCESS_CONFIG"
 tail -f "${ACCESS_CONFIG}" "--pid=${install_pid}" | while IFS=: read -r key value; do
   case "${key}" in
-    certSha256)
-      # Bypass encoding
-      log_for_sentry "Writing certSha256 tag"
-      echo "${value}" | cloud::add_encoded_kv_tag "${key}"
-      ;;
     apiUrl)
       log_for_sentry "Writing apiUrl tag"
       echo -n "${value}" | cloud::add_kv_tag "${key}"
