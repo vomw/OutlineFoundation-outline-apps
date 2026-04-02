@@ -25,61 +25,61 @@ import (
 	"golang.getoutline.org/sdk/transport"
 )
 
-// WrapForwardStreamDialer creates a StreamDialer to intercept and redirect TCP based DNS connections.
-// It intercepts all TCP connection for `localIP:53` and redirects them to `resolverAddr` via the `base` StreamDialer.
-func WrapForwardStreamDialer(base transport.StreamDialer, localAddr, resolverAddr netip.AddrPort) (transport.StreamDialer, error) {
+// NewDNSRedirectStreamDialer creates a StreamDialer to intercept and redirect TCP based DNS connections.
+// It intercepts all TCP connection for `resolverLinkLocalAddr:53` and redirects them to `resolverRemoteAddr` via the `base` StreamDialer.
+func NewDNSRedirectStreamDialer(base transport.StreamDialer, resolverLinkLocalAddr, resolverRemoteAddr netip.AddrPort) (transport.StreamDialer, error) {
 	if base == nil {
 		return nil, errors.New("base StreamDialer must be provided")
 	}
-	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		if dst, err := netip.ParseAddrPort(addr); err == nil && isEquivalentAddrPort(dst, localAddr) {
-			addr = resolverAddr.String()
+	return transport.FuncStreamDialer(func(ctx context.Context, targetAddr string) (transport.StreamConn, error) {
+		if dst, err := netip.ParseAddrPort(targetAddr); err == nil && isEquivalentAddrPort(dst, resolverLinkLocalAddr) {
+			targetAddr = resolverRemoteAddr.String()
 		}
-		return base.DialStream(ctx, addr)
+		return base.DialStream(ctx, targetAddr)
 	}), nil
 }
 
-// forwardPacketProxy wraps another PacketProxy to intercept and redirect DNS packets.
-type forwardPacketProxy struct {
-	base          network.PacketProxy
-	local, resolv netip.AddrPort
+// dnsRedirectPacketProxy wraps another PacketProxy to intercept and redirect DNS packets.
+type dnsRedirectPacketProxy struct {
+	base                                      network.PacketProxy
+	resolverLinkLocalAddr, resolverRemoteAddr netip.AddrPort
 }
 
-type forwardPacketReqSender struct {
+type dnsRedirectPacketReqSender struct {
 	network.PacketRequestSender
-	fpp *forwardPacketProxy
+	fpp *dnsRedirectPacketProxy
 }
 
-// forwardPacketRespReceiver intercepts incoming packets from the remote DNS resolver.
+// dnsRedirectPacketRespReceiver intercepts incoming packets from the remote DNS resolver.
 // It remaps the source address from the remote resolver back to the local DNS address,
 // and closes the underlying session after delivering the first DNS response to free the
 // transport session immediately rather than waiting for the idle timeout.
-type forwardPacketRespReceiver struct {
+type dnsRedirectPacketRespReceiver struct {
 	network.PacketResponseReceiver
-	fpp    *forwardPacketProxy
+	fpp    *dnsRedirectPacketProxy
 	once   sync.Once                   // ensures the session is closed at most once
 	mu     sync.Mutex                  // protects sender; required for Go memory model correctness
 	sender network.PacketRequestSender // the request sender to close after first DNS response
 }
 
-var _ network.PacketProxy = (*forwardPacketProxy)(nil)
+var _ network.PacketProxy = (*dnsRedirectPacketProxy)(nil)
 
-// WrapForwardPacketProxy creates a PacketProxy to intercept and redirect UDP based DNS packets.
-// It intercepts all packets to `localAddr` and redirecrs them to `resolverAddr` via the `base` PacketProxy.
-func WrapForwardPacketProxy(base network.PacketProxy, localAddr, resolverAddr netip.AddrPort) (network.PacketProxy, error) {
+// NewDNSRedirectPacketProxy creates a PacketProxy to intercept and redirect UDP based DNS packets.
+// It intercepts all packets to `resolverLinkLocalAddr` and redirecrs them to `resolverRemoteAddr` via the `base` PacketProxy.
+func NewDNSRedirectPacketProxy(base network.PacketProxy, resolverLinkLocalAddr, resolverRemoteAddr netip.AddrPort) (network.PacketProxy, error) {
 	if base == nil {
 		return nil, errors.New("base PacketProxy must be provided")
 	}
-	return &forwardPacketProxy{
-		base:   base,
-		local:  localAddr,
-		resolv: resolverAddr,
+	return &dnsRedirectPacketProxy{
+		base:                  base,
+		resolverLinkLocalAddr: resolverLinkLocalAddr,
+		resolverRemoteAddr:    resolverRemoteAddr,
 	}, nil
 }
 
 // NewSession implements PacketProxy.NewSession.
-func (fpp *forwardPacketProxy) NewSession(resp network.PacketResponseReceiver) (_ network.PacketRequestSender, err error) {
-	wrapper := &forwardPacketRespReceiver{PacketResponseReceiver: resp, fpp: fpp}
+func (fpp *dnsRedirectPacketProxy) NewSession(resp network.PacketResponseReceiver) (_ network.PacketRequestSender, err error) {
+	wrapper := &dnsRedirectPacketRespReceiver{PacketResponseReceiver: resp, fpp: fpp}
 	base, err := fpp.base.NewSession(wrapper)
 	if err != nil {
 		return nil, err
@@ -87,14 +87,14 @@ func (fpp *forwardPacketProxy) NewSession(resp network.PacketResponseReceiver) (
 	wrapper.mu.Lock()
 	wrapper.sender = base
 	wrapper.mu.Unlock()
-	return &forwardPacketReqSender{base, fpp}, nil
+	return &dnsRedirectPacketReqSender{base, fpp}, nil
 }
 
 // WriteTo intercepts outgoing DNS request packets.
 // If a packet is destined for the local resolver, it remaps the destination to the remote resolver.
-func (req *forwardPacketReqSender) WriteTo(p []byte, destination netip.AddrPort) (int, error) {
-	if isEquivalentAddrPort(destination, req.fpp.local) {
-		destination = req.fpp.resolv
+func (req *dnsRedirectPacketReqSender) WriteTo(p []byte, destination netip.AddrPort) (int, error) {
+	if isEquivalentAddrPort(destination, req.fpp.resolverLinkLocalAddr) {
+		destination = req.fpp.resolverRemoteAddr
 	}
 	return req.PacketRequestSender.WriteTo(p, destination)
 }
@@ -104,9 +104,9 @@ func (req *forwardPacketReqSender) WriteTo(p []byte, destination netip.AddrPort)
 // resolver and then closes the underlying session.  DNS is one-shot (one query, one response),
 // so closing immediately frees the transport session rather than holding it open until the 30-second
 // write-idle timeout, preventing resource exhaustion under sustained DNS load.
-func (resp *forwardPacketRespReceiver) WriteFrom(p []byte, source net.Addr) (int, error) {
-	if addr, ok := source.(*net.UDPAddr); ok && isEquivalentAddrPort(addr.AddrPort(), resp.fpp.resolv) {
-		source = net.UDPAddrFromAddrPort(resp.fpp.local)
+func (resp *dnsRedirectPacketRespReceiver) WriteFrom(p []byte, source net.Addr) (int, error) {
+	if addr, ok := source.(*net.UDPAddr); ok && isEquivalentAddrPort(addr.AddrPort(), resp.fpp.resolverRemoteAddr) {
+		source = net.UDPAddrFromAddrPort(resp.fpp.resolverLinkLocalAddr)
 		n, err := resp.PacketResponseReceiver.WriteFrom(p, source)
 		resp.once.Do(func() {
 			resp.mu.Lock()
@@ -118,4 +118,3 @@ func (resp *forwardPacketRespReceiver) WriteFrom(p []byte, source net.Addr) (int
 	}
 	return resp.PacketResponseReceiver.WriteFrom(p, source)
 }
-

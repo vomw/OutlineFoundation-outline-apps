@@ -21,9 +21,9 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"golang.getoutline.org/sdk/network"
 	"golang.getoutline.org/sdk/transport"
-	"github.com/stretchr/testify/require"
 )
 
 // ----- forward StreamDialer tests -----
@@ -43,10 +43,10 @@ func TestWrapForwardStreamDialer(t *testing.T) {
 	local := netip.MustParseAddrPort("192.0.2.1:53")
 	resolver := netip.MustParseAddrPort("8.8.8.8:53")
 
-	_, err := WrapForwardStreamDialer(nil, local, resolver)
+	_, err := NewDNSRedirectStreamDialer(nil, local, resolver)
 	require.Error(t, err)
 
-	dialer, err := WrapForwardStreamDialer(sd, local, resolver)
+	dialer, err := NewDNSRedirectStreamDialer(sd, local, resolver)
 	require.NoError(t, err)
 
 	_, err = dialer.DialStream(context.TODO(), "192.0.2.1:53")
@@ -112,10 +112,10 @@ func TestWrapForwardPacketProxy(t *testing.T) {
 	nonResolver := netip.MustParseAddrPort("203.0.113.10:123")
 	nonResolverUDPAddr := net.UDPAddrFromAddrPort(nonResolver)
 
-	_, err := WrapForwardPacketProxy(nil, local, resolver)
+	_, err := NewDNSRedirectPacketProxy(nil, local, resolver)
 	require.Error(t, err)
 
-	fpp, err := WrapForwardPacketProxy(pp, local, resolver)
+	fpp, err := NewDNSRedirectPacketProxy(pp, local, resolver)
 	require.NoError(t, err)
 
 	req, err := fpp.NewSession(resp)
@@ -161,7 +161,7 @@ func TestWrapForwardPacketProxy_NonDNSResponseDoesNotClose(t *testing.T) {
 	nonResolver := netip.MustParseAddrPort("203.0.113.10:123")
 	nonResolverUDPAddr := net.UDPAddrFromAddrPort(nonResolver)
 
-	fpp, err := WrapForwardPacketProxy(pp, local, resolver)
+	fpp, err := NewDNSRedirectPacketProxy(pp, local, resolver)
 	require.NoError(t, err)
 
 	req, err := fpp.NewSession(resp)

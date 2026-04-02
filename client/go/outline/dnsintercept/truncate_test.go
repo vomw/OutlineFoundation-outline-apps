@@ -30,10 +30,10 @@ func TestWrapTruncatePacketProxy(t *testing.T) {
 	local := netip.MustParseAddrPort("192.0.2.2:53")
 	udpAddr := netip.MustParseAddrPort("203.0.113.10:123")
 
-	_, err := WrapTruncatePacketProxy(nil, local)
+	_, err := NewDNSTruncatePacketProxy(nil, local)
 	require.Error(t, err)
 
-	tpp, err := WrapTruncatePacketProxy(pp, local)
+	tpp, err := NewDNSTruncatePacketProxy(pp, local)
 	require.NoError(t, err)
 
 	req, err := tpp.NewSession(resp)
@@ -77,7 +77,7 @@ func TestWrapTruncatePacketProxy_DNSOnlyDoesNotCreateBaseSession(t *testing.T) {
 
 	local := netip.MustParseAddrPort("192.0.2.2:53")
 
-	tpp, err := WrapTruncatePacketProxy(pp, local)
+	tpp, err := NewDNSTruncatePacketProxy(pp, local)
 	require.NoError(t, err)
 
 	req, err := tpp.NewSession(resp)
