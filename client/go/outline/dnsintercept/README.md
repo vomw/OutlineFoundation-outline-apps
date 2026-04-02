@@ -109,7 +109,7 @@ In truncate mode, no transport session is opened for DNS at all — the truncate
 
 ## Dynamic switching
 
-The two modes are wired together by the caller (`config.wrapTransportPairWithOutlineDNS`) using a `DelegatePacketProxy`.  The VPN starts in truncate mode (safe default) and switches to forward mode once UDP connectivity is confirmed.  It switches back to truncate mode if connectivity is lost.
+The two modes are wired together by the caller (`configregistry.wrapTransportPairWithOutlineDNS`) using a `DelegatePacketProxy`.  The VPN starts in truncate mode (safe default) and switches to forward mode once UDP connectivity is confirmed.  It switches back to truncate mode if connectivity is lost.
 
 ```mermaid
 flowchart LR
@@ -129,6 +129,6 @@ flowchart LR
 
 | File | Description |
 |------|-------------|
-| `forward.go` | `WrapForwardStreamDialer` and `WrapForwardPacketProxy` — redirect DNS to a real resolver |
-| `truncate.go` | `WrapTruncatePacketProxy` — respond with TC=1 to force TCP retry |
+| `forward.go` | `NewDNSRedirectStreamDialer` and `NewDNSRedirectPacketProxy` — redirect DNS to a real resolver |
+| `truncate.go` | `NewDNSTruncatePacketProxy` — respond with TC=1 to force TCP retry |
 | `helpers.go` | `isEquivalentAddrPort` — address comparison ignoring IPv4-in-IPv6 mapping |
