@@ -41,7 +41,7 @@ func NewDNSRedirectStreamDialer(base transport.StreamDialer, resolverLinkLocalAd
 
 // dnsRedirectPacketProxy wraps another PacketProxy to intercept and redirect DNS packets.
 type dnsRedirectPacketProxy struct {
-	base                                      network.PacketProxy
+	baseProxy                                      network.PacketProxy
 	resolverLinkLocalAddr, resolverRemoteAddr netip.AddrPort
 }
 
@@ -71,7 +71,7 @@ func NewDNSRedirectPacketProxy(base network.PacketProxy, resolverLinkLocalAddr, 
 		return nil, errors.New("base PacketProxy must be provided")
 	}
 	return &dnsRedirectPacketProxy{
-		base:                  base,
+		baseProxy:                  base,
 		resolverLinkLocalAddr: resolverLinkLocalAddr,
 		resolverRemoteAddr:    resolverRemoteAddr,
 	}, nil
@@ -80,14 +80,14 @@ func NewDNSRedirectPacketProxy(base network.PacketProxy, resolverLinkLocalAddr, 
 // NewSession implements PacketProxy.NewSession.
 func (fpp *dnsRedirectPacketProxy) NewSession(resp network.PacketResponseReceiver) (_ network.PacketRequestSender, err error) {
 	wrapper := &dnsRedirectPacketRespReceiver{PacketResponseReceiver: resp, fpp: fpp}
-	base, err := fpp.base.NewSession(wrapper)
+	baseSender, err := fpp.baseProxy.NewSession(wrapper)
 	if err != nil {
 		return nil, err
 	}
 	wrapper.mu.Lock()
-	wrapper.sender = base
+	wrapper.sender = baseSender
 	wrapper.mu.Unlock()
-	return &dnsRedirectPacketReqSender{base, fpp}, nil
+	return &dnsRedirectPacketReqSender{baseSender, fpp}, nil
 }
 
 // WriteTo intercepts outgoing DNS request packets.

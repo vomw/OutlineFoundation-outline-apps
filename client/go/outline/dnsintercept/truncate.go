@@ -36,12 +36,12 @@ type dnsTruncatePacketProxy struct {
 // base proxy.  The base session is created lazily on the first non-DNS packet,
 // avoiding a wasted transport session for DNS-only flows.
 type dnsTruncatePacketReqSender struct {
-	mu        sync.Mutex
-	base      network.PacketRequestSender    // nil until first non-DNS packet; guarded by mu
-	baseProxy network.PacketProxy            // used to lazily create base
-	resp      network.PacketResponseReceiver // passed to base when it is created
-	trunc     network.PacketRequestSender    // handles DNS packets locally without a transport session
-	local     netip.AddrPort                 // the DNS address to intercept
+	mu                    sync.Mutex
+	baseSender            network.PacketRequestSender    // nil until first non-DNS packet; guarded by mu
+	baseProxy             network.PacketProxy            // used to lazily create base
+	respReceiver          network.PacketResponseReceiver // passed to base when it is created
+	truncate53PP          network.PacketRequestSender    // handles DNS packets locally without a transport session
+	resolverLinkLocalAddr netip.AddrPort                 // the DNS address to intercept
 }
 
 // NewDNSTruncatePacketProxy creates a PacketProxy to intercept UDP-based DNS packets and force a TCP retry.
@@ -70,16 +70,16 @@ func NewDNSTruncatePacketProxy(base network.PacketProxy, resolverLinkLocalAddr n
 //
 // Only the trunc session is created eagerly.  The base session is deferred
 // until the first non-DNS packet arrives.
-func (tpp *dnsTruncatePacketProxy) NewSession(resp network.PacketResponseReceiver) (_ network.PacketRequestSender, err error) {
-	trunc, err := tpp.truncate53PP.NewSession(resp)
+func (tpp *dnsTruncatePacketProxy) NewSession(respReceiver network.PacketResponseReceiver) (_ network.PacketRequestSender, err error) {
+	trunc, err := tpp.truncate53PP.NewSession(respReceiver)
 	if err != nil {
 		return nil, err
 	}
 	return &dnsTruncatePacketReqSender{
-		baseProxy: tpp.PacketProxy,
-		resp:      resp,
-		trunc:     trunc,
-		local:     tpp.resolverLinkLocalAddr,
+		baseProxy:             tpp.PacketProxy,
+		respReceiver:          respReceiver,
+		truncate53PP:          trunc,
+		resolverLinkLocalAddr: tpp.resolverLinkLocalAddr,
 	}, nil
 }
 
@@ -87,19 +87,19 @@ func (tpp *dnsTruncatePacketProxy) NewSession(resp network.PacketResponseReceive
 // If so, it truncates the packet. Otherwise, it passes it to the base proxy,
 // creating the base session on demand if this is the first non-DNS packet.
 func (req *dnsTruncatePacketReqSender) WriteTo(p []byte, destination netip.AddrPort) (int, error) {
-	if isEquivalentAddrPort(destination, req.local) {
-		return req.trunc.WriteTo(p, destination)
+	if isEquivalentAddrPort(destination, req.resolverLinkLocalAddr) {
+		return req.truncate53PP.WriteTo(p, destination)
 	}
 	req.mu.Lock()
-	if req.base == nil {
-		base, err := req.baseProxy.NewSession(req.resp)
+	if req.baseSender == nil {
+		base, err := req.baseProxy.NewSession(req.respReceiver)
 		if err != nil {
 			req.mu.Unlock()
 			return 0, err
 		}
-		req.base = base
+		req.baseSender = base
 	}
-	sender := req.base
+	sender := req.baseSender
 	req.mu.Unlock()
 	return sender.WriteTo(p, destination)
 }
@@ -108,8 +108,8 @@ func (req *dnsTruncatePacketReqSender) WriteTo(p []byte, destination netip.AddrP
 func (req *dnsTruncatePacketReqSender) Close() (err error) {
 	req.mu.Lock()
 	defer req.mu.Unlock()
-	if req.base != nil {
-		err = req.base.Close()
+	if req.baseSender != nil {
+		err = req.baseSender.Close()
 	}
-	return errors.Join(err, req.trunc.Close())
+	return errors.Join(err, req.truncate53PP.Close())
 }
