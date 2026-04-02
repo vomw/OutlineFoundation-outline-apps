@@ -65,7 +65,7 @@ type dnsRedirectPacketRespReceiver struct {
 var _ network.PacketProxy = (*dnsRedirectPacketProxy)(nil)
 
 // NewDNSRedirectPacketProxy creates a PacketProxy to intercept and redirect UDP based DNS packets.
-// It intercepts all packets to `resolverLinkLocalAddr` and redirecrs them to `resolverRemoteAddr` via the `base` PacketProxy.
+// It intercepts all packets to `resolverLinkLocalAddr` and redirects them to `resolverRemoteAddr` via the `base` PacketProxy.
 func NewDNSRedirectPacketProxy(base network.PacketProxy, resolverLinkLocalAddr, resolverRemoteAddr netip.AddrPort) (network.PacketProxy, error) {
 	if base == nil {
 		return nil, errors.New("base PacketProxy must be provided")
