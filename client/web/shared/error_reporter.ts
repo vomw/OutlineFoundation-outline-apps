@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import * as Sentry from '@sentry/browser';
-import type { Integration } from '@sentry/core';
+import type {Integration} from '@sentry/core';
 
-export type Tags = { [id: string]: string | boolean | number };
+export type Tags = {[id: string]: string | boolean | number};
 
 export interface OutlineErrorReporter {
   sendFeedback(
@@ -48,7 +48,7 @@ export class SentryErrorReporter implements OutlineErrorReporter {
     userEmail?: string,
     tags?: Tags
   ): Promise<void> {
-    const combinedTags = { ...this.tags, ...tags };
+    const combinedTags = {...this.tags, ...tags};
     Sentry.captureFeedback({
       message: message,
       email: userEmail,
@@ -68,7 +68,7 @@ export class SentryErrorReporter implements OutlineErrorReporter {
       (event: PromiseRejectionEvent) => {
         const reason = event.reason;
         const msg = reason.stack ? reason.stack : reason;
-        Sentry.addBreadcrumb({ message: msg, category: unhandledRejection });
+        Sentry.addBreadcrumb({message: msg, category: unhandledRejection});
       }
     );
   }
