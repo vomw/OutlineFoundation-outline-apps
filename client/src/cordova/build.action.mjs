@@ -158,6 +158,7 @@ async function appleRelease(platform) {
     'archive',
     '-configuration',
     'Release',
+    '-allowProvisioningUpdates',
     ...teamIdArgs
   );
 }

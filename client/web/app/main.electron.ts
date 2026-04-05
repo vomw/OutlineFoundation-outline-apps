@@ -40,13 +40,16 @@ const isLinux = window.electron.os.platform === 'linux';
 const isOsSupported = isWindows || isLinux;
 
 const interceptor = new UrlInterceptor();
-window.electron.methodChannel.on('add-server', (_: Event, url: string) => {
-  interceptor.executeListeners(url);
-});
+window.electron.methodChannel.on(
+  'add-server',
+  (_: Electron.IpcRendererEvent, url: string) => {
+    interceptor.executeListeners(url);
+  }
+);
 
 window.electron.methodChannel.on(
   'localization-request',
-  (_: Event, localizationKeys: string[]) => {
+  (_: Electron.IpcRendererEvent, localizationKeys: string[]) => {
     const localize = getLocalizationFunction();
     if (!localize) {
       console.error('Localization function not available.');
@@ -109,7 +112,8 @@ class ElectronErrorReporter implements OutlineErrorReporter {
   constructor() {
     // parameters are initialized in main process
     Sentry.init({
-      integrations: getSentryBrowserIntegrations,
+      integrations: (integrations: any) =>
+        (getSentryBrowserIntegrations as any)(integrations),
     });
   }
 
