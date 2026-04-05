@@ -336,9 +336,9 @@ export class App {
     appRoot.addEventListener('SubmitFeedback', (event: CustomEvent) => {
       const detail: FeedbackDetail = event.detail;
       try {
-        Sentry.captureFeedback({
+        Sentry.captureEvent({
           message: detail.userFeedback,
-          email: detail.userEmail,
+          user: {email: detail.userEmail},
           tags: {
             category: detail.feedbackCategory,
             cloudProvider: detail.cloudProvider,

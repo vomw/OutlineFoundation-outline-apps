@@ -19,22 +19,22 @@ import '@material/mwc-radio';
 import '@material/mwc-select';
 import '@material/mwc-formfield';
 import '@polymer/paper-dialog/paper-dialog';
-import { SingleSelectedEvent } from '@material/mwc-list/mwc-list';
-import { Radio } from '@material/mwc-radio';
+import {SingleSelectedEvent} from '@material/mwc-list/mwc-list';
+import {Radio} from '@material/mwc-radio';
 
-import { Localizer } from '@outline/infrastructure/i18n';
-import { PaperDialogElement } from '@polymer/paper-dialog/paper-dialog';
+import {Localizer} from '@outline/infrastructure/i18n';
+import {PaperDialogElement} from '@polymer/paper-dialog/paper-dialog';
 import '@polymer/paper-button/paper-button';
 import * as Sentry from '@sentry/electron/renderer';
-import { html, css, LitElement, TemplateResult, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
-import { Ref, createRef, ref } from 'lit/directives/ref.js';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import {html, css, LitElement, TemplateResult, nothing} from 'lit';
+import {customElement, property, state} from 'lit/decorators.js';
+import {Ref, createRef, ref} from 'lit/directives/ref.js';
+import {unsafeHTML} from 'lit/directives/unsafe-html.js';
 
-import { COMMON_STYLES } from './cloud-install-styles';
-import { OutlineFeedbackDialog } from './outline-feedback-dialog';
+import {COMMON_STYLES} from './cloud-install-styles';
+import {OutlineFeedbackDialog} from './outline-feedback-dialog';
 import './outline-support-form';
-import { FormValues, OutlineSupportForm } from './outline-support-form';
+import {FormValues, OutlineSupportForm} from './outline-support-form';
 
 /** The possible steps in the stepper. Only one step is shown at a time. */
 enum ProgressStep {
@@ -66,7 +66,8 @@ const UNSUPPORTED_ISSUE_TYPE_HELPPAGES = new Map([
 @customElement('outline-contact-us-dialog')
 export class OutlineContactUsDialog
   extends LitElement
-  implements OutlineFeedbackDialog {
+  implements OutlineFeedbackDialog
+{
   static get styles() {
     return [
       COMMON_STYLES,
@@ -149,7 +150,7 @@ export class OutlineContactUsDialog
     IssueType.GENERAL,
   ];
 
-  @property({ type: Function }) localize: Localizer = msg => msg;
+  @property({type: Function}) localize: Localizer = msg => msg;
 
   @state() private installationFailed = false;
 
@@ -162,17 +163,17 @@ export class OutlineContactUsDialog
     value: boolean;
     labelMsg: string;
   }> = [
-      {
-        ref: createRef(),
-        value: true,
-        labelMsg: 'yes',
-      },
-      {
-        ref: createRef(),
-        value: false,
-        labelMsg: 'no',
-      },
-    ];
+    {
+      ref: createRef(),
+      value: true,
+      labelMsg: 'yes',
+    },
+    {
+      ref: createRef(),
+      value: false,
+      labelMsg: 'no',
+    },
+  ];
 
   @state() private showIssueSelector = false;
   private formValues: Partial<FormValues> = {};
@@ -229,13 +230,14 @@ export class OutlineContactUsDialog
       throw Error('Cannot submit invalid form.');
     }
 
-    const { description, email, ...tags } = this.formValues as FormValues;
+    const {description, email, ...tags} = this.formValues as FormValues;
     try {
-      Sentry.captureFeedback({
+      Sentry.captureEvent({
         message: description,
-        email: email,
+        user: {email},
         tags: {
-          category: this.selectedIssueType?.toString(),
+          category: this.selectedIssueType?.toString() ?? 'unknown',
+          isFeedback: true,
           formVersion: 2,
           ...tags,
         },
@@ -259,8 +261,8 @@ export class OutlineContactUsDialog
     const closeLink = '</a>';
     return html`
       ${unsafeHTML(
-      this.localize(messageID, 'openLink', openLink, 'closeLink', closeLink)
-    )}
+        this.localize(messageID, 'openLink', openLink, 'closeLink', closeLink)
+      )}
     `;
   }
 
@@ -308,7 +310,7 @@ export class OutlineContactUsDialog
 
           <ol>
             ${this.openTicketSelectionOptions.map(
-          element => html`
+              element => html`
                 <li>
                   <mwc-formfield .label=${this.localize(element.labelMsg)}>
                     <mwc-radio
@@ -322,7 +324,7 @@ export class OutlineContactUsDialog
                   </mwc-formfield>
                 </li>
               `
-        )}
+            )}
           </ol>
 
           <mwc-select
@@ -332,12 +334,12 @@ export class OutlineContactUsDialog
             @selected="${this.selectIssue}"
           >
             ${OutlineContactUsDialog.ISSUES.map(value => {
-          return html`
+              return html`
                 <mwc-list-item value="${value}">
                   <span>${this.localize(`contact-view-issue-${value}`)}</span>
                 </mwc-list-item>
               `;
-        })}
+            })}
           </mwc-select>
         `;
       }
@@ -353,8 +355,8 @@ export class OutlineContactUsDialog
         <h2>${titleMsg}</h2>
         <main>${this.renderMainContent}</main>
         ${this.currentStep === ProgressStep.FORM
-        ? nothing
-        : html`
+          ? nothing
+          : html`
               <fieldset class="buttons">
                 <paper-button dialog-dismiss=""
                   >${this.localize('cancel')}</paper-button

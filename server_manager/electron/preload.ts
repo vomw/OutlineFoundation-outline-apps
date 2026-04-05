@@ -14,7 +14,7 @@
 
 import '@sentry/electron/preload';
 import type {HttpRequest, HttpResponse} from '@outline/infrastructure/path_api';
-import type {Breadcrumb} from '@sentry/core';
+import {Breadcrumb} from '@sentry/electron';
 import {contextBridge, ipcRenderer} from 'electron';
 
 import * as digitalocean_oauth from './digitalocean_oauth';

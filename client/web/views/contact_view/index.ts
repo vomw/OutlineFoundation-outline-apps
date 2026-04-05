@@ -297,7 +297,7 @@ export class ContactView extends LitElement {
 
     const {description, email, ...tags} = this.formValues as FormValues;
     try {
-      await this.errorReporter.sendFeedback(
+      await this.errorReporter.report(
         description,
         this.selectedIssueType?.toString() ?? 'unknown',
         email,
