@@ -17,6 +17,7 @@
 import 'web-animations-js/web-animations-next-lite.min.js';
 import '@webcomponents/webcomponentsjs/webcomponents-bundle.js';
 
+import {Integration} from '@sentry/core';
 import * as Sentry from '@sentry/electron/renderer';
 
 import {AbstractClipboard} from './clipboard';
@@ -112,8 +113,10 @@ class ElectronErrorReporter implements OutlineErrorReporter {
   constructor() {
     // parameters are initialized in main process
     Sentry.init({
-      integrations: (integrations: any) =>
-        (getSentryBrowserIntegrations as any)(integrations),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      integrations: (integrations: Integration[]) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getSentryBrowserIntegrations(integrations) as Integration[],
     });
   }
 
@@ -160,4 +163,4 @@ main({
   getUpdater: () => new ElectronUpdater(),
   getVpnServiceInstaller: () => new ElectronVpnInstaller(),
   quitApplication: () => window.electron.methodChannel.send('quit-app'),
-});
+}).catch(console.error);
