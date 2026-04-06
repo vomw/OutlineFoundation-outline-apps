@@ -73,6 +73,7 @@ export async function main(...parameters) {
 
     await spawnStream('npx', 'capacitor-assets', 'generate');
     await spawnStream('npx', 'cap', 'copy');
+    await syncAndroidIfNeeded(nativePlatform, capRoot);
 
     let buildResult;
     switch (platform + buildMode) {
@@ -122,6 +123,25 @@ export async function main(...parameters) {
     return buildResult;
   } finally {
     process.chdir(prevCwd);
+  }
+}
+
+async function syncAndroidIfNeeded(nativePlatform, capRoot) {
+  if (nativePlatform !== 'android') {
+    return;
+  }
+
+  const cordovaVariablesGradlePath = path.resolve(
+    capRoot,
+    'android',
+    'capacitor-cordova-android-plugins',
+    'cordova.variables.gradle'
+  );
+
+  try {
+    await fs.access(cordovaVariablesGradlePath);
+  } catch {
+    await spawnStream('npx', 'cap', 'sync', 'android');
   }
 }
 
