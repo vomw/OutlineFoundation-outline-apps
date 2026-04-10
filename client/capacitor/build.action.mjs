@@ -18,7 +18,6 @@ import url from 'url';
 
 import webpackConfig from './webpack.config.js';
 import {getBuildParameters} from '../build/get_build_parameters.mjs';
-import {getWebpackBuildMode} from '../build/get_webpack_build_mode.mjs';
 import {runWebpack} from '../build/run_webpack.mjs';
 
 const capacitorDir = path.dirname(url.fileURLToPath(import.meta.url));
@@ -29,7 +28,7 @@ const capacitorDir = path.dirname(url.fileURLToPath(import.meta.url));
  * @param {string[]} parameters
  */
 export async function main(...parameters) {
-  const {platform, buildMode, versionName, buildNumber, sentryDsn} =
+  const {platform, buildMode, versionName, buildNumber} =
     getBuildParameters(parameters);
 
   if (platform !== 'browser') {
@@ -38,57 +37,31 @@ export async function main(...parameters) {
     );
   }
 
+  if (buildMode !== 'debug') {
+    throw new TypeError(
+      `Capacitor browser build supports only debug mode, got "${buildMode}".`
+    );
+  }
+
   await buildWebBundle({
-    buildMode,
     versionName,
     buildNumber,
-    sentryDsn,
   });
 }
 
-async function buildWebBundle({
-  buildMode,
-  versionName,
-  buildNumber,
-  sentryDsn,
-}) {
-  validateReleaseBuildParams(buildMode, versionName, sentryDsn);
-  await writeEnvironmentJson(versionName, buildNumber, sentryDsn);
-  const mode = getWebpackBuildMode(buildMode);
-  await runWebpack({...webpackConfig, mode});
+async function buildWebBundle({versionName, buildNumber}) {
+  await writeEnvironmentJson(versionName, buildNumber);
+  await runWebpack({...webpackConfig, mode: 'development'});
 }
 
-function validateReleaseBuildParams(buildMode, versionName, sentryDsn) {
-  if (buildMode !== 'release') {
-    return;
-  }
-  if (versionName === '0.0.0') {
-    throw new TypeError(
-      'Release builds require a valid versionName, but it is set to 0.0.0.'
-    );
-  }
-  if (!sentryDsn) {
-    throw new TypeError(
-      'Release builds require SENTRY_DSN, but it is not defined.'
-    );
-  }
-  try {
-    new URL(sentryDsn);
-  } catch {
-    throw new TypeError(`The sentryDsn ${sentryDsn} is not a valid URL!`);
-  }
-}
-
-async function writeEnvironmentJson(versionName, buildNumber, sentryDsn) {
+async function writeEnvironmentJson(versionName, buildNumber) {
   process.env.APP_VERSION = versionName;
   process.env.APP_BUILD_NUMBER = String(buildNumber);
-  process.env.SENTRY_DSN = sentryDsn ?? '';
 
   const environmentJson = JSON.stringify(
     {
       APP_VERSION: process.env.APP_VERSION,
       APP_BUILD_NUMBER: process.env.APP_BUILD_NUMBER,
-      SENTRY_DSN: process.env.SENTRY_DSN,
     },
     null,
     2
