@@ -37,7 +37,6 @@ import {autoUpdater} from 'electron-updater';
 import {lookupIp} from './connectivity';
 import {invokeGoMethod} from './go_plugin';
 import {GoVpnTunnel} from './go_vpn_tunnel';
-import {installRoutingServices, RoutingDaemon} from './routing_service';
 import {TunnelStore} from './tunnel_store';
 import {closeVpn, establishVpn, onVpnStateChanged} from './vpn_service';
 import {VpnTunnel} from './vpn_tunnel';
@@ -347,20 +346,9 @@ async function tearDownAutoLaunch() {
 // specified at build time.
 async function createVpnTunnel(
   request: StartRequestJson,
-  isAutoConnect: boolean
+  _isAutoConnect: boolean
 ): Promise<VpnTunnel> {
-  // We must convert the host from a potential "hostname" to an "IP" address
-  // because startVpn will add a routing table entry that prefixed with this
-  // host (e.g. "<host>/32"), therefore <host> must be an IP address.
-  // TODO: make sure we resolve it in the native code
-  const {host} = net.splitHostPort(request.firstHop);
-  if (!host) {
-    throw new errors.IllegalServerConfiguration('host is missing');
-  }
-  const hostIp = await lookupIp(host);
-  const routing = new RoutingDaemon(hostIp || '', isAutoConnect);
-  const tunnel = new GoVpnTunnel(routing, request.id, request.client);
-  routing.onNetworkChange = tunnel.networkChanged.bind(tunnel);
+  const tunnel = new GoVpnTunnel(request.id, request.client);
   return tunnel;
 }
 
@@ -584,17 +572,7 @@ function main() {
   // Install backend services and return the error code
   // TODO: refactor channel name and namespace to a constant
   ipcMain.handle('outline-ipc-install-outline-services', async () => {
-    // catch custom errors (even simple as numbers) does not work for ipcRenderer:
-    // https://github.com/electron/electron/issues/24427
-    try {
-      await installRoutingServices();
-      return errors.ErrorCode.NO_ERROR;
-    } catch (e) {
-      if (typeof e === 'number') {
-        return e;
-      }
-      return errors.ErrorCode.UNEXPECTED;
-    }
+    return errors.ErrorCode.NO_ERROR;
   });
 
   // TODO: refactor channel name and namespace to a constant

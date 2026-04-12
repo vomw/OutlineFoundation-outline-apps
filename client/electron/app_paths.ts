@@ -65,21 +65,3 @@ export function pathToBackendLibrary() {
   );
 }
 
-/**
- * Get the parent directory path containing the background service binaries.
- * On Windows, this folder contains `OutlineService.exe`.
- * While on Linux this folder contains `outline_proxy_controller`.
- * @returns A string representing the path of the directory that contains service binaries.
- */
-export function pathToEmbeddedOutlineService() {
-  if (IS_WINDOWS) {
-    return getAppPath();
-  }
-  return path.join(
-    unpackedAppPath(),
-    'client',
-    'electron',
-    'linux_proxy_controller',
-    'dist'
-  );
-}

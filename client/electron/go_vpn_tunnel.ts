@@ -19,32 +19,18 @@ import {powerMonitor} from 'electron';
 import {pathToEmbeddedTun2socksBinary} from './app_paths';
 import {checkUDPConnectivity, checkUDPConnectivityWindows} from './go_helpers';
 import {ChildProcessHelper, ProcessTerminatedSignalError} from './process';
-import {RoutingDaemon} from './routing_service';
 import {VpnTunnel} from './vpn_tunnel';
 import {TunnelStatus} from '../web/app/outline_server_repository/vpn';
 
 const IS_LINUX = platform() === 'linux';
 const IS_WINDOWS = platform() === 'win32';
 
-const TUN2SOCKS_TAP_DEVICE_NAME = IS_LINUX ? 'outline-tun0' : 'outline-tap0';
-const TUN2SOCKS_TAP_DEVICE_IP = '10.0.85.2';
-const TUN2SOCKS_VIRTUAL_ROUTER_IP = '10.0.85.1';
-const TUN2SOCKS_VIRTUAL_ROUTER_NETMASK = '255.255.255.0';
+const SOCKS5_ADDR = '127.0.0.1:1080';
 
-// Cloudflare and Quad9 resolvers.
-const DNS_RESOLVERS = ['1.1.1.1', '9.9.9.9'];
-
-// Establishes a full-system VPN with the help of Outline's routing daemon and child process
-// outline-go-tun2socks. The routing service modifies the routing table so that the TAP device
-// receives all device traffic. outline-go-tun2socks process TCP and UDP traffic from the TAP
-// device and relays it to an Outline proxy server.
+// Establishes a local SOCKS5 proxy using outline-go-tun2socks.
 //
-// |TAP| <-> |outline-go-tun2socks| <-> |Outline proxy|
+// |App (SOCKS5)| <-> |outline-go-tun2socks| <-> |Outline proxy|
 //
-// In addition to the basic lifecycle of the helper processes, this class restarts tun2socks
-// on unexpected failures and network changes if necessary.
-// Follows the Mediator pattern in that none of the "helpers" know anything
-// about the others.
 export class GoVpnTunnel implements VpnTunnel {
   private readonly tun2socks: GoTun2socks;
   private isDebugMode = false;
@@ -53,7 +39,6 @@ export class GoVpnTunnel implements VpnTunnel {
   private disconnected = false;
 
   private isUdpEnabled = false;
-  private gatewayAdapterIndex?: string;
 
   private readonly onAllHelpersStopped: Promise<void>;
   private resolveAllHelpersStopped: () => void;
@@ -63,7 +48,6 @@ export class GoVpnTunnel implements VpnTunnel {
   private reconnectedListener?: () => void;
 
   constructor(
-    private readonly routing: RoutingDaemon,
     readonly keyId: string,
     readonly clientConfig: string
   ) {
@@ -76,9 +60,6 @@ export class GoVpnTunnel implements VpnTunnel {
     this.onAllHelpersStopped = new Promise(resolve => {
       this.resolveAllHelpersStopped = resolve;
     });
-
-    // Handle network changes and, on Windows, suspend events.
-    this.routing.onNetworkChange = this.networkChanged.bind(this);
   }
 
   // Turns on verbose logging for the managed processes. Must be called before launching the
@@ -97,20 +78,11 @@ export class GoVpnTunnel implements VpnTunnel {
       powerMonitor.on('resume', this.resumeListener.bind(this));
     }
 
-    // Disconnect the tunnel if the routing service disconnects unexpectedly.
-    this.routing.onceDisconnected
-      .then(async () => {
-        await this.disconnect();
-      })
-      .catch(e => {
-        console.error('error in routing service disconnection:', e);
-      });
-
     if (checkProxyConnectivity) {
       if (IS_WINDOWS) {
         this.isUdpEnabled = await checkUDPConnectivityWindows(
           this.clientConfig,
-          this.gatewayAdapterIndex,
+          undefined,
           this.isDebugMode
         );
       } else {
@@ -122,16 +94,11 @@ export class GoVpnTunnel implements VpnTunnel {
     }
     console.log(`UDP support: ${this.isUdpEnabled}`);
 
-    console.log('starting routing daemon');
-    this.gatewayAdapterIndex = await this.routing.start();
     await this.startTun2socks();
   }
 
-  networkChanged(status: TunnelStatus, gatewayIndex?: string) {
+  networkChanged(status: TunnelStatus, _gatewayIndex?: string) {
     if (status === TunnelStatus.CONNECTED) {
-      if (gatewayIndex) {
-        this.gatewayAdapterIndex = gatewayIndex;
-      }
       if (this.reconnectedListener) {
         this.reconnectedListener();
       }
@@ -173,8 +140,7 @@ export class GoVpnTunnel implements VpnTunnel {
     if (IS_WINDOWS) {
       return this.tun2socks.startWindows(
         this.clientConfig,
-        this.isUdpEnabled,
-        this.gatewayAdapterIndex
+        this.isUdpEnabled
       );
     } else {
       return this.tun2socks.start(this.clientConfig, this.isUdpEnabled);
@@ -186,7 +152,7 @@ export class GoVpnTunnel implements VpnTunnel {
       if (IS_WINDOWS) {
         this.isUdpEnabled = await checkUDPConnectivityWindows(
           this.clientConfig,
-          this.gatewayAdapterIndex,
+          undefined,
           this.isDebugMode
         );
       } else {
@@ -228,13 +194,6 @@ export class GoVpnTunnel implements VpnTunnel {
       }
     }
 
-    try {
-      await this.routing.stop();
-    } catch (e) {
-      // This can happen for several reasons, e.g. the daemon may have stopped while we were
-      // connected.
-      console.error(`could not stop routing: ${e.message}`);
-    }
     this.resolveAllHelpersStopped();
     this.disconnected = true;
   }
@@ -286,13 +245,10 @@ class GoTun2socks {
    */
   startWindows(
     clientConfig: string,
-    isUdpEnabled: boolean,
-    adapterIndex?: string
+    isUdpEnabled: boolean
   ): Promise<void> {
     const args: string[] = [];
-    if (adapterIndex) {
-      args.push('-adapterIndex', adapterIndex);
-    }
+    args.push('-socks5Addr', SOCKS5_ADDR);
     return this.startWithPlatformSpecificArgs(clientConfig, isUdpEnabled, args);
   }
 
@@ -302,17 +258,11 @@ class GoTun2socks {
     args: string[]
   ): Promise<void> {
     // ./tun2socks.exe \
-    //   -tunName outline-tap0 -tunDNS 1.1.1.1,9.9.9.9 \
-    //   -tunAddr 10.0.85.2 -tunGw 10.0.85.1 -tunMask 255.255.255.0 \
+    //   -socks5Addr 127.0.0.1:1080 \
     //   -client '{ "transport:" {"host": "127.0.0.1", "port": 1080, "password": "mypassword", "cipher": "chacha20-ietf-poly1035"} }' \
     //   [-dnsFallback] [-checkConnectivity] [-proxyPrefix]
 
     args.push('-keyID', this.keyId);
-    args.push('-tunName', TUN2SOCKS_TAP_DEVICE_NAME);
-    args.push('-tunAddr', TUN2SOCKS_TAP_DEVICE_IP);
-    args.push('-tunGw', TUN2SOCKS_VIRTUAL_ROUTER_IP);
-    args.push('-tunMask', TUN2SOCKS_VIRTUAL_ROUTER_NETMASK);
-    args.push('-tunDNS', DNS_RESOLVERS.join(','));
     args.push('-client', clientConfig);
     args.push('-logLevel', this.process.isDebugModeEnabled ? 'debug' : 'info');
     if (!isUdpEnabled) {

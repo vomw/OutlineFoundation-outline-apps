@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/Wifx/gonetworkmanager/v2 v2.1.0
+	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/eycorsican/go-tun2socks v1.16.11
 	github.com/goccy/go-yaml v1.18.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8

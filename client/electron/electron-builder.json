@@ -5,7 +5,6 @@
     "client/electron/linux_proxy_controller/dist",
     "output/client/linux-amd64/libbackend.so",
     "output/client/linux-amd64/tun2socks",
-    "output/client/windows-386/backend.dll",
     "output/client/windows-386/tun2socks.exe"
   ],
   "directories": {
@@ -58,12 +57,14 @@
   },
   "nsis": {
     "include": "client/electron/custom_install_steps.nsh",
-    "perMachine": true
+    "perMachine": false,
+    "allowElevation": false
   },
   "win": {
     "files": [
       "output/client/windows-386",
-      "!output/client/windows-386/*.h"
+      "!output/client/windows-386/*.h",
+      "!output/client/windows-386/backend.dll"
     ],
     "icon": "client/electron/icons/win/icon.ico",
     "sign": "client/electron/windows/electron_builder_signing_plugin.cjs",
