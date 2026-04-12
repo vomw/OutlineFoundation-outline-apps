@@ -65,5 +65,6 @@ jobs:
         with:
           name: Outline-Client-Windows
           path: |
+            output/client/electron/build/*.zip
             output/client/electron/build/*.exe
             output/client/electron/build/*.blockmap

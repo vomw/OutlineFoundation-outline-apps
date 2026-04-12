@@ -5,6 +5,7 @@
     "client/electron/linux_proxy_controller/dist",
     "output/client/linux-amd64/libbackend.so",
     "output/client/linux-amd64/tun2socks",
+    "output/client/windows-386/backend.dll",
     "output/client/windows-386/tun2socks.exe"
   ],
   "directories": {
@@ -63,18 +64,13 @@
   "win": {
     "files": [
       "output/client/windows-386",
-      "!output/client/windows-386/*.h",
-      "!output/client/windows-386/backend.dll"
+      "!output/client/windows-386/*.h"
     ],
     "icon": "client/electron/icons/win/icon.ico",
-    "sign": "client/electron/windows/electron_builder_signing_plugin.cjs",
-    "signingHashAlgorithms": [
-      "sha256"
-    ],
     "target": [
       {
         "arch": "ia32",
-        "target": "nsis"
+        "target": "zip"
       }
     ]
   }
