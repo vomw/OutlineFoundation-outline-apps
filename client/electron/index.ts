@@ -393,8 +393,15 @@ async function startVpn(request: StartRequestJson, isAutoConnect: boolean) {
 
   // Don't check connectivity on boot: if the key was revoked or network connectivity is not ready,
   // we want the system to stay "connected" so that traffic doesn't leak.
-  await currentTunnel.connect(!isAutoConnect);
-  setUiTunnelStatus(TunnelStatus.CONNECTED, request.id);
+  try {
+    await currentTunnel.connect(!isAutoConnect);
+    setUiTunnelStatus(TunnelStatus.CONNECTED, request.id);
+    console.log('SOCKS5 proxy server is now running on 127.0.0.1:1080');
+  } catch (e) {
+    console.error('Failed to start SOCKS5 proxy:', e);
+    setUiTunnelStatus(TunnelStatus.DISCONNECTED, request.id);
+    throw e;
+  }
 }
 
 // Invoked by both the stop-proxying event and quit handler.

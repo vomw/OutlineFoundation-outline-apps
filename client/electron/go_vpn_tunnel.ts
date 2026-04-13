@@ -79,17 +79,22 @@ export class GoVpnTunnel implements VpnTunnel {
     }
 
     if (checkProxyConnectivity) {
-      if (IS_WINDOWS) {
-        this.isUdpEnabled = await checkUDPConnectivityWindows(
-          this.clientConfig,
-          undefined,
-          this.isDebugMode
-        );
-      } else {
-        this.isUdpEnabled = await checkUDPConnectivity(
-          this.clientConfig,
-          this.isDebugMode
-        );
+      try {
+        if (IS_WINDOWS) {
+          this.isUdpEnabled = await checkUDPConnectivityWindows(
+            this.clientConfig,
+            undefined,
+            this.isDebugMode
+          );
+        } else {
+          this.isUdpEnabled = await checkUDPConnectivity(
+            this.clientConfig,
+            this.isDebugMode
+          );
+        }
+      } catch (e) {
+        console.warn(`Connectivity check failed: ${e.message}. Proceeding anyway.`);
+        this.isUdpEnabled = true;
       }
     }
     console.log(`UDP support: ${this.isUdpEnabled}`);
@@ -163,7 +168,9 @@ export class GoVpnTunnel implements VpnTunnel {
       }
       console.log(`UDP support now ${this.isUdpEnabled}`);
     } catch (e) {
-      console.error('connectivity check failed:', e);
+      console.warn('connectivity check failed:', e);
+      // Keep existing UDP setting or default to true
+      this.isUdpEnabled = true;
     }
 
     // Restart tun2socks.

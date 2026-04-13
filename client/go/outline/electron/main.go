@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -132,8 +133,10 @@ func main() {
 	// Start SOCKS5 server
 	conf := &socks5.Config{
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			slog.Debug("SOCKS5 dialing", "addr", addr)
 			return client.DialStream(ctx, addr)
 		},
+		Logger: log.New(os.Stdout, "SOCKS5: ", log.LstdFlags),
 	}
 	srv, err := socks5.New(conf)
 	if err != nil {
