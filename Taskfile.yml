@@ -19,7 +19,7 @@ set: [pipefail]
 run: when_changed
 
 includes:
-  client:tun2socks: ./client/go/Taskfile.yml
+  client:socks5-proxy: ./client/go/Taskfile.yml
   client:
     taskfile: ./client/Taskfile.yml
     vars:
@@ -28,7 +28,7 @@ includes:
 tasks:
   clean:
     deps:
-      - client:tun2socks:clean
+      - client:socks5-proxy:clean
     cmds:
       - rm -rf .task
 

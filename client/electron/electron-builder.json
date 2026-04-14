@@ -4,9 +4,9 @@
   "asarUnpack": [
     "client/electron/linux_proxy_controller/dist",
     "output/client/linux-amd64/libbackend.so",
-    "output/client/linux-amd64/tun2socks",
+    "output/client/linux-amd64/socks5-proxy",
     "output/client/windows-386/backend.dll",
-    "output/client/windows-386/tun2socks.exe"
+    "output/client/windows-386/socks5-proxy.exe"
   ],
   "directories": {
     "buildResources": "output/client/electron",

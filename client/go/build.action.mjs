@@ -19,7 +19,7 @@ import {spawnStream} from '@outline/infrastructure/build/spawn_stream.mjs';
 import {getBuildParameters} from '../build/get_build_parameters.mjs';
 
 /**
- * @description Builds the tun2socks library for the specified platform.
+ * @description Builds the SOCKS5 proxy library for the specified platform.
  *
  * @param {string[]} parameters
  */
@@ -30,7 +30,7 @@ export async function main(...parameters) {
     'tool',
     'task',
     '-v',
-    `client:tun2socks:${targetPlatform}`
+    `client:socks5-proxy:${targetPlatform}`
   );
 }
 

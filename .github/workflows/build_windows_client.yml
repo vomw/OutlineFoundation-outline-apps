@@ -51,6 +51,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Tidy Go Modules
+        run: go mod tidy
+
       - name: Install zig
         uses: mlugg/setup-zig@v1
         with:

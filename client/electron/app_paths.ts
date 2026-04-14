@@ -45,13 +45,13 @@ export function getAppPath() {
   return electronAppPath;
 }
 
-export function pathToEmbeddedTun2socksBinary() {
+export function pathToEmbeddedSocks5ProxyBinary() {
   return path.join(
     unpackedAppPath(),
     'output',
     'client',
     IS_WINDOWS ? 'windows-386' : 'linux-amd64',
-    IS_WINDOWS ? 'tun2socks.exe' : 'tun2socks'
+    IS_WINDOWS ? 'socks5-proxy.exe' : 'socks5-proxy'
   );
 }
 

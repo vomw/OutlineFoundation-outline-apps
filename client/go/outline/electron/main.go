@@ -144,8 +144,7 @@ func main() {
 	}()
 
 	// This message is used in TypeScript to determine whether the server has been started successfully.
-	// We keep the prefix "tun2socks running" for compatibility with the existing Electron monitoring logic.
-	logger.Info("tun2socks running (SOCKS5 mode)", "addr", *args.socks5Addr)
+	logger.Info("SOCKS5 proxy running", "addr", *args.socks5Addr)
 
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)

@@ -16,7 +16,7 @@ import {platform} from 'os';
 
 import {powerMonitor} from 'electron';
 
-import {pathToEmbeddedTun2socksBinary} from './app_paths';
+import {pathToEmbeddedSocks5ProxyBinary} from './app_paths';
 import {checkUDPConnectivity, checkUDPConnectivityWindows} from './go_helpers';
 import {ChildProcessHelper, ProcessTerminatedSignalError} from './process';
 import {VpnTunnel} from './vpn_tunnel';
@@ -222,19 +222,19 @@ export class GoVpnTunnel implements VpnTunnel {
 // GoSocks5Proxy is a Go program that listens for SOCKS5 requests
 // and relays it to a Outline proxy server.
 class GoSocks5Proxy {
-  // Resolved when proxy prints "tun2socks running" to stdout
+  // Resolved when proxy prints "SOCKS5 proxy running" to stdout
   // Call `monitorStarted` to set this field
   private whenStarted: Promise<void>;
   private stopRequested = false;
   private readonly process: ChildProcessHelper;
 
   constructor(readonly keyId: string) {
-    this.process = new ChildProcessHelper(pathToEmbeddedTun2socksBinary());
+    this.process = new ChildProcessHelper(pathToEmbeddedSocks5ProxyBinary());
   }
 
   /**
    * Starts proxy process, and waits for it to launch successfully.
-   * Success is confirmed when the phrase "tun2socks running" is detected in the `stdout`.
+   * Success is confirmed when the phrase "SOCKS5 proxy running" is detected in the `stdout`.
    * Otherwise, an error containing a JSON-formatted message will be thrown.
    * @param isUdpEnabled Indicates whether the remote Outline server supports UDP.
    */
@@ -276,8 +276,7 @@ class GoSocks5Proxy {
   private monitorStarted(): Promise<void> {
     return (this.whenStarted = new Promise(resolve => {
       this.process.onStdOut = (data?: string | Buffer) => {
-        // We still monitor for "tun2socks running" which is the success signal from Go
-        if (data?.toString().includes('tun2socks running')) {
+        if (data?.toString().includes('SOCKS5 proxy running')) {
           console.debug('[socks5Proxy] - started');
           this.process.onStdOut = null;
           resolve();

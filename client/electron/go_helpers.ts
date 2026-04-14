@@ -18,7 +18,7 @@
  * allowing users to call Go functions from TypeScript.
  */
 
-import {pathToEmbeddedTun2socksBinary} from './app_paths';
+import {pathToEmbeddedSocks5ProxyBinary} from './app_paths';
 import {ChildProcessHelper} from './process';
 
 /**
@@ -30,7 +30,7 @@ import {ChildProcessHelper} from './process';
  * @param debugMode Optional. Whether to forward logs to stdout. Defaults to false.
  * @returns A boolean indicating whether UDP forwarding is supported.
  * @throws Error if TCP connection cannot be established.
- * @throws ProcessTerminatedExitCodeError if tun2socks failed to run.
+ * @throws ProcessTerminatedExitCodeError if proxy failed to run.
  */
 export function checkUDPConnectivity(
   clientConfig: string,
@@ -52,7 +52,7 @@ export function checkUDPConnectivity(
  * @param debugMode Optional. Whether to forward logs to stdout. Defaults to false.
  * @returns A boolean indicating whether UDP forwarding is supported.
  * @throws Error if TCP connection cannot be established.
- * @throws ProcessTerminatedExitCodeError if tun2socks failed to run.
+ * @throws ProcessTerminatedExitCodeError if proxy failed to run.
  */
 export function checkUDPConnectivityWindows(
   clientConfig: string,
@@ -70,11 +70,11 @@ async function checkUDPConnectivityWithArgs(
   args: string[],
   debugMode: boolean
 ): Promise<boolean> {
-  const tun2socks = new ChildProcessHelper(pathToEmbeddedTun2socksBinary());
-  tun2socks.isDebugModeEnabled = debugMode;
+  const socks5Proxy = new ChildProcessHelper(pathToEmbeddedSocks5ProxyBinary());
+  socks5Proxy.isDebugModeEnabled = debugMode;
 
-  console.debug('[tun2socks] - checking connectivity ...', args);
-  const output = await tun2socks.launch(args);
+  console.debug('[socks5Proxy] - checking connectivity ...', args);
+  const output = await socks5Proxy.launch(args);
 
   // Only parse the first line, because sometimes Windows Crypto API adds warnings to stdout.
   const outObj = JSON.parse(output.split('\n')[0]);
