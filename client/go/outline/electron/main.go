@@ -20,22 +20,20 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	"github.com/armon/go-socks5"
+	"github.com/things-go/go-socks5"
 	"localhost/client/go/outline"
 	"localhost/client/go/outline/configregistry"
 	"localhost/client/go/outline/connectivity"
 	"localhost/client/go/outline/platerrors"
 )
 
-// Exit codes. Must be kept in sync with definitions in "go_vpn_tunnel.ts"
+// Exit codes.
 const (
 	exitCodeSuccess = 0
 	exitCodeFailure = 1
@@ -64,9 +62,6 @@ var args struct {
 var version string // Populated at build time through `-X main.version=...`
 
 func main() {
-	// Windows Network Adapter Index (still kept for potential binding)
-	args.adapterIndex = flag.Int("adapterIndex", -1, "Windows network adapter index for proxy connection")
-
 	// Proxy client config
 	args.keyID = flag.String("keyID", "", "The ID of the key being used")
 	args.clientConfig = flag.String("client", "", "A JSON object containing the client config, UTF8-encoded")
@@ -80,6 +75,9 @@ func main() {
 	// Misc
 	args.logLevel = flag.String("logLevel", "info", "Logging level: debug|info|warn|error|none")
 	args.version = flag.Bool("version", false, "Print the version and exit.")
+
+	// Windows Network Adapter Index (still kept for potential binding in dialers)
+	args.adapterIndex = flag.Int("adapterIndex", -1, "Windows network adapter index for proxy connection")
 
 	flag.Parse()
 
@@ -123,35 +121,31 @@ func main() {
 
 	if err := client.StartSession(); err != nil {
 		printErrorAndExit(platerrors.PlatformError{
-			Code:    platerrors.SetupSystemVPNFailed,
+			Code:    platerrors.InternalError,
 			Message: "failed start backend client",
 			Cause:   platerrors.ToPlatformError(err),
 		}, exitCodeFailure)
 	}
 	defer client.EndSession()
 
-	// Start SOCKS5 server
-	conf := &socks5.Config{
-		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			slog.Debug("SOCKS5 dialing", "addr", addr)
+	// Start SOCKS5 server using github.com/things-go/go-socks5
+	srv := socks5.NewServer(
+		socks5.WithDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+			slog.Debug("SOCKS5 proxy dialing", "addr", addr)
 			return client.DialStream(ctx, addr)
-		},
-		Logger: log.New(os.Stdout, "SOCKS5: ", log.LstdFlags),
-	}
-	srv, err := socks5.New(conf)
-	if err != nil {
-		printErrorAndExit(err, exitCodeFailure)
-	}
+		}),
+	)
 
 	go func() {
+		logger.Info("SOCKS5 proxy server starting", "addr", *args.socks5Addr)
 		if err := srv.ListenAndServe("tcp", *args.socks5Addr); err != nil {
-			logger.Error("SOCKS5 server failed", "err", err)
+			logger.Error("SOCKS5 proxy server failed", "err", err)
 		}
 	}()
 
-	// This message is used in TypeScript to determine whether the server has been started successfully
-	// We keep "tun2socks running" to minimize changes in Electron for now, but mark it as SOCKS5
-	logger.Info("tun2socks running (SOCKS5 mode)...", "addr", *args.socks5Addr)
+	// This message is used in TypeScript to determine whether the server has been started successfully.
+	// We keep the prefix "tun2socks running" for compatibility with the existing Electron monitoring logic.
+	logger.Info("tun2socks running (SOCKS5 mode)", "addr", *args.socks5Addr)
 
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -161,7 +155,7 @@ func main() {
 
 func setLogLevel(level string) {
 	slvl := slog.LevelInfo
-	switch strings.ToLower(level) {
+	switch level {
 	case "debug":
 		slvl = slog.LevelDebug
 	case "info":

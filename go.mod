@@ -4,11 +4,10 @@ go 1.25
 
 require (
 	github.com/Wifx/gonetworkmanager/v2 v2.1.0
-	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/eycorsican/go-tun2socks v1.16.11
 	github.com/goccy/go-yaml v1.18.0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.10.0
+	github.com/things-go/go-socks5 v0.0.5
 	go.nhat.io/cookiejar v0.3.0
 	golang.getoutline.org/sdk v0.0.21-alpha.1
 	golang.getoutline.org/sdk/x v0.0.9-alpha.1

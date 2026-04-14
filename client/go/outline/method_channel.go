@@ -27,22 +27,10 @@ import (
 
 // API name constants. Keep sorted by name.
 const (
-	// CloseVPN closes an existing VPN connection and restores network traffic to the default
-	// network interface.
-	//  - Input: null
-	//  - Output: null
-	MethodCloseVPN = "CloseVPN"
-
 	// EraseServiceStorage erases all file storage for the given service.
 	//  - Input: the key ID of the service
 	//  - Output: null
 	MethodEraseServiceStorage = "EraseServiceStorage"
-
-	// EstablishVPN initiates a VPN connection and directs all network traffic through Outline.
-	//
-	//  - Input: a JSON string of vpn.configJSON.
-	//  - Output: a JSON string of vpn.connectionJSON.
-	MethodEstablishVPN = "EstablishVPN"
 
 	// FetchResource fetches a resource located at a given URL.
 	//  - Input: the URL string of the resource to fetch
@@ -53,16 +41,6 @@ const (
 	//  - Input: the tunnel config text
 	//  - Output: the TunnelConfigJson that Typescript needs
 	MethodParseTunnelConfig = "ParseTunnelConfig"
-
-	// SetVPNStateChangeListener sets a callback to be invoked when the VPN state changes.
-	//
-	// We recommend the caller to set this listener at app startup to catch all VPN state changes.
-	// Users might start the VPN from system settings, bypassing the app;
-	// so setting the listener when connecting within the app might miss some events.
-	//
-	//  - Input: A callback token string.
-	//  - Output: null
-	MethodSetVPNStateChangeListener = "SetVPNStateChangeListener"
 )
 
 // InvokeMethodResult represents the result of an InvokeMethod call.
@@ -76,20 +54,8 @@ type InvokeMethodResult struct {
 // InvokeMethod calls a method by name.
 func InvokeMethod(method string, input string) *InvokeMethodResult {
 	switch method {
-	case MethodCloseVPN:
-		err := getSingletonVPNAPI().Close()
-		return &InvokeMethodResult{
-			Error: platerrors.ToPlatformError(err),
-		}
-
 	case MethodEraseServiceStorage:
 		err := handleEraseServiceStorage(input)
-		return &InvokeMethodResult{
-			Error: platerrors.ToPlatformError(err),
-		}
-
-	case MethodEstablishVPN:
-		err := getSingletonVPNAPI().Establish(input)
 		return &InvokeMethodResult{
 			Error: platerrors.ToPlatformError(err),
 		}
@@ -104,12 +70,6 @@ func InvokeMethod(method string, input string) *InvokeMethodResult {
 
 	case MethodParseTunnelConfig:
 		return doParseTunnelConfig(input)
-
-	case MethodSetVPNStateChangeListener:
-		err := setVPNStateChangeListener(input)
-		return &InvokeMethodResult{
-			Error: platerrors.ToPlatformError(err),
-		}
 
 	default:
 		return &InvokeMethodResult{Error: &platerrors.PlatformError{

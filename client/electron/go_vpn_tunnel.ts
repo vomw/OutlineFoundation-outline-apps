@@ -27,12 +27,12 @@ const IS_WINDOWS = platform() === 'win32';
 
 const SOCKS5_ADDR = '127.0.0.1:1080';
 
-// Establishes a local SOCKS5 proxy using outline-go-tun2socks.
+// Establishes a local SOCKS5 proxy using outline-go-socks5-proxy.
 //
-// |App (SOCKS5)| <-> |outline-go-tun2socks| <-> |Outline proxy|
+// |App (SOCKS5)| <-> |outline-go-socks5-proxy| <-> |Outline proxy|
 //
 export class GoVpnTunnel implements VpnTunnel {
-  private readonly tun2socks: GoTun2socks;
+  private readonly socks5Proxy: GoSocks5Proxy;
   private isDebugMode = false;
 
   // See #resumeListener.
@@ -51,7 +51,7 @@ export class GoVpnTunnel implements VpnTunnel {
     readonly keyId: string,
     readonly clientConfig: string
   ) {
-    this.tun2socks = new GoTun2socks(keyId);
+    this.socks5Proxy = new GoSocks5Proxy(keyId);
 
     // This promise, tied to both helper process' exits, is key to the instance's
     // lifecycle:
@@ -66,14 +66,13 @@ export class GoVpnTunnel implements VpnTunnel {
   // processes
   enableDebugMode() {
     this.isDebugMode = true;
-    this.tun2socks.enableDebugMode();
+    this.socks5Proxy.enableDebugMode();
   }
 
-  // Fulfills once all three helpers have started successfully.
+  // Fulfills once all helpers have started successfully.
   async connect(checkProxyConnectivity: boolean) {
     if (IS_WINDOWS) {
-      // Windows: when the system suspends, tun2socks terminates due to the TAP device getting
-      // closed.
+      // Windows: when the system suspends, the proxy might need restart.
       powerMonitor.on('suspend', this.suspendListener.bind(this));
       powerMonitor.on('resume', this.resumeListener.bind(this));
     }
@@ -99,7 +98,7 @@ export class GoVpnTunnel implements VpnTunnel {
     }
     console.log(`UDP support: ${this.isUdpEnabled}`);
 
-    await this.startTun2socks();
+    await this.startSocks5Proxy();
   }
 
   networkChanged(status: TunnelStatus, _gatewayIndex?: string) {
@@ -110,22 +109,21 @@ export class GoVpnTunnel implements VpnTunnel {
 
       // Test whether UDP availability has changed; since it won't change 99% of the time, do this
       // *after* we've informed the client we've reconnected.
-      void this.updateUdpAndRestartTun2socks();
+      void this.updateUdpAndRestartProxy();
     } else if (status === TunnelStatus.RECONNECTING) {
       if (this.reconnectingListener) {
         this.reconnectingListener();
       }
     } else {
       console.error(
-        `unknown network change status ${status} from routing daemon`
+        `unknown network change status ${status}`
       );
     }
   }
 
   private async suspendListener() {
-    // Preemptively stop tun2socks to avoid a silent restart that will fail.
-    await this.tun2socks.stop();
-    console.log('stopped tun2socks in preparation for suspend');
+    await this.socks5Proxy.stop();
+    console.log('stopped SOCKS5 proxy in preparation for suspend');
   }
 
   private async resumeListener() {
@@ -137,22 +135,22 @@ export class GoVpnTunnel implements VpnTunnel {
       return;
     }
 
-    console.log('restarting tun2socks after resume');
-    await this.updateUdpAndRestartTun2socks();
+    console.log('restarting SOCKS5 proxy after resume');
+    await this.updateUdpAndRestartProxy();
   }
 
-  private startTun2socks(): Promise<void> {
+  private startSocks5Proxy(): Promise<void> {
     if (IS_WINDOWS) {
-      return this.tun2socks.startWindows(
+      return this.socks5Proxy.startWindows(
         this.clientConfig,
         this.isUdpEnabled
       );
     } else {
-      return this.tun2socks.start(this.clientConfig, this.isUdpEnabled);
+      return this.socks5Proxy.start(this.clientConfig, this.isUdpEnabled);
     }
   }
 
-  private async updateUdpAndRestartTun2socks() {
+  private async updateUdpAndRestartProxy() {
     try {
       if (IS_WINDOWS) {
         this.isUdpEnabled = await checkUDPConnectivityWindows(
@@ -173,13 +171,13 @@ export class GoVpnTunnel implements VpnTunnel {
       this.isUdpEnabled = true;
     }
 
-    // Restart tun2socks.
+    // Restart proxy.
     try {
-      await this.tun2socks.stop();
+      await this.socks5Proxy.stop();
     } catch {
       // Ignore the errors
     }
-    await this.startTun2socks();
+    await this.startSocks5Proxy();
   }
 
   // Use #onceDisconnected to be notified when the tunnel terminates.
@@ -194,10 +192,10 @@ export class GoVpnTunnel implements VpnTunnel {
     }
 
     try {
-      await this.tun2socks.stop();
+      await this.socks5Proxy.stop();
     } catch (e) {
       if (!(e instanceof ProcessTerminatedSignalError)) {
-        console.error(`could not stop tun2socks: ${e.message}`);
+        console.error(`could not stop SOCKS5 proxy: ${e.message}`);
       }
     }
 
@@ -206,28 +204,25 @@ export class GoVpnTunnel implements VpnTunnel {
   }
 
   // Fulfills once all helper processes have stopped.
-  //
-  // When this happens, *as many changes made to the system in order to establish the full-system
-  // VPN as possible* will have been reverted.
   get onceDisconnected() {
     return this.onAllHelpersStopped;
   }
 
-  // Sets an optional callback for when the routing daemon is attempting to re-connect.
+  // Sets an optional callback for when the proxy is attempting to re-connect.
   onReconnecting(newListener: () => void | undefined) {
     this.reconnectingListener = newListener;
   }
 
-  // Sets an optional callback for when the routing daemon successfully reconnects.
+  // Sets an optional callback for when the proxy successfully reconnects.
   onReconnected(newListener: () => void | undefined) {
     this.reconnectedListener = newListener;
   }
 }
 
-// outline-go-tun2socks is a Go program that processes IP traffic from a TUN/TAP device
+// GoSocks5Proxy is a Go program that listens for SOCKS5 requests
 // and relays it to a Outline proxy server.
-class GoTun2socks {
-  // Resolved when Tun2socks prints "tun2socks running" to stdout
+class GoSocks5Proxy {
+  // Resolved when proxy prints "tun2socks running" to stdout
   // Call `monitorStarted` to set this field
   private whenStarted: Promise<void>;
   private stopRequested = false;
@@ -238,7 +233,7 @@ class GoTun2socks {
   }
 
   /**
-   * Starts tun2socks process, and waits for it to launch successfully.
+   * Starts proxy process, and waits for it to launch successfully.
    * Success is confirmed when the phrase "tun2socks running" is detected in the `stdout`.
    * Otherwise, an error containing a JSON-formatted message will be thrown.
    * @param isUdpEnabled Indicates whether the remote Outline server supports UDP.
@@ -248,7 +243,7 @@ class GoTun2socks {
   }
 
   /**
-   * Starts tun2socks process with Windows specific CLI arguments.
+   * Starts proxy process with Windows specific CLI arguments.
    */
   startWindows(
     clientConfig: string,
@@ -264,14 +259,10 @@ class GoTun2socks {
     isUdpEnabled: boolean,
     args: string[]
   ): Promise<void> {
-    // ./tun2socks.exe \
-    //   -socks5Addr 127.0.0.1:1080 \
-    //   -client '{ "transport:" {"host": "127.0.0.1", "port": 1080, "password": "mypassword", "cipher": "chacha20-ietf-poly1035"} }' \
-    //   [-dnsFallback] [-checkConnectivity] [-proxyPrefix]
-
     args.push('-keyID', this.keyId);
     args.push('-client', clientConfig);
     args.push('-logLevel', this.process.isDebugModeEnabled ? 'debug' : 'info');
+    // Note: dnsFallback is not directly applicable to pure SOCKS5 mode but kept for Go compatibility if needed
     if (!isUdpEnabled) {
       args.push('-dnsFallback');
     }
@@ -285,8 +276,9 @@ class GoTun2socks {
   private monitorStarted(): Promise<void> {
     return (this.whenStarted = new Promise(resolve => {
       this.process.onStdOut = (data?: string | Buffer) => {
+        // We still monitor for "tun2socks running" which is the success signal from Go
         if (data?.toString().includes('tun2socks running')) {
-          console.debug('[tun2socks] - started');
+          console.debug('[socks5Proxy] - started');
           this.process.onStdOut = null;
           resolve();
         }
@@ -295,12 +287,12 @@ class GoTun2socks {
   }
 
   private async launchWithAutoRestart(args: string[]): Promise<void> {
-    console.debug('[tun2socks] - starting to route network traffic ...', args);
+    console.debug('[socks5Proxy] - starting SOCKS5 proxy ...', args);
     let restarting = false;
     let lastError: Error | null = null;
     do {
       if (restarting) {
-        console.warn('[tun2socks] - exited unexpectedly; restarting ...');
+        console.warn('[socks5Proxy] - exited unexpectedly; restarting ...');
       }
       restarting = false;
       this.monitorStarted()
@@ -308,14 +300,14 @@ class GoTun2socks {
           restarting = true;
         })
         .catch(e => {
-          console.error('[tun2socks] - failed to monitor start:', e);
+          console.error('[socks5Proxy] - failed to monitor start:', e);
         });
       try {
         lastError = null;
         await this.process.launch(args, false);
-        console.info('[tun2socks] - exited with no errors');
+        console.info('[socks5Proxy] - exited with no errors');
       } catch (e) {
-        console.error('[tun2socks] - terminated due to:', e);
+        console.error('[socks5Proxy] - terminated due to:', e);
         lastError = e;
       }
     } while (!this.stopRequested && restarting);
