@@ -90,13 +90,15 @@ tasks:
     cmds:
       - rm -rf "{{.TARGET_DIR}}" && mkdir -p "{{.TARGET_DIR}}"
       - "{{.GOMOBILE_BIND_CMD}} -target=android -androidapi '{{.ANDROID_API}}' -o '{{.TARGET_DIR}}/socks5-proxy-0.0.1.aar' '{{.TASKFILE_DIR}}/outline/platerrors' '{{.TASKFILE_DIR}}/outline'"
-      - echo $'<?xml version="1.0" encoding="UTF-8"?>\n<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>org.getoutline.client</groupId>
-  <artifactId>socks5-proxy</artifactId>
-  <version>0.0.1</version>
-  <packaging>aar</packaging>
-</project>' > "{{.TARGET_DIR}}/socks5-proxy-0.0.1.pom"
+      - |
+        echo '<?xml version="1.0" encoding="UTF-8"?>
+        <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.getoutline.client</groupId>
+          <artifactId>socks5-proxy</artifactId>
+          <version>0.0.1</version>
+          <packaging>aar</packaging>
+        </project>' > "{{.TARGET_DIR}}/socks5-proxy-0.0.1.pom"
     deps: ["gomobile", ":client:android:configure"]
 
   apple:
