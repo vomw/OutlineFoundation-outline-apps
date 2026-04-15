@@ -33,7 +33,6 @@ import (
 	"github.com/things-go/go-socks5"
 	"localhost/client/go/outline"
 	"localhost/client/go/outline/connectivity"
-	"golang.getoutline.org/sdk/transport"
 )
 
 var (
