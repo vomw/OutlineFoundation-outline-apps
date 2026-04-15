@@ -101,8 +101,9 @@ type Endpoint[ConnType any] struct {
 
 // TransportPair provides a StreamDialer and PacketListener, to use as the transport in a Tun2Socks VPN.
 type TransportPair struct {
-	StreamDialer *Dialer[transport.StreamConn]
-	PacketProxy  *PacketProxy
+	StreamDialer   *Dialer[transport.StreamConn]
+	PacketProxy    *PacketProxy
+	PacketListener *PacketListener
 }
 
 var _ transport.StreamDialer = (*TransportPair)(nil)

@@ -43,6 +43,7 @@ import (
 type Client struct {
 	sd            *configregistry.Dialer[transport.StreamConn]
 	pp            *configregistry.PacketProxy
+	pl            transport.PacketListener
 	reporter      reporting.Reporter
 	sessionCancel context.CancelFunc
 }
@@ -50,6 +51,14 @@ type Client struct {
 // DialStream implements StreamDialer.DialStream.
 func (c *Client) DialStream(ctx context.Context, address string) (transport.StreamConn, error) {
 	return c.sd.Dial(ctx, address)
+}
+
+// ListenPacket implements PacketListener.ListenPacket.
+func (c *Client) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+	if c.pl == nil {
+		return nil, errors.New("UDP is not supported by this client")
+	}
+	return c.pl.ListenPacket(ctx)
 }
 
 // NewSession implements PacketProxy.NewSession.
@@ -155,7 +164,11 @@ func (c *ClientConfig) new(keyID string, providerClientConfigText string) (*Clie
 		}
 	}
 
-	client := &Client{sd: transportPair.StreamDialer, pp: transportPair.PacketProxy}
+	client := &Client{
+		sd: transportPair.StreamDialer,
+		pp: transportPair.PacketProxy,
+		pl: transportPair.PacketListener,
+	}
 
 	// TODO: figure out a better way to handle parse calls.
 	if providerClientConfig.Reporter != nil {
