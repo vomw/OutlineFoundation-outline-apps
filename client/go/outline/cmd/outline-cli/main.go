@@ -30,19 +30,27 @@ import (
 	"syscall"
 	"time"
 
-	"golang.getoutline.org/sdk/transport"
-	"golang.getoutline.org/sdk/x/socks5server"
+	"github.com/things-go/go-socks5"
 	"localhost/client/go/outline"
 	"localhost/client/go/outline/connectivity"
+	"golang.getoutline.org/sdk/transport"
 )
 
 var (
-	version    = "dev"
+	version       = "dev"
 	transportConf = ""
-	socksAddr  = "127.0.0.1:1080"
-	verbose    = false
-	skipCheck  = false
+	socksAddr     = "127.0.0.1:1080"
+	verbose       = false
+	skipCheck     = false
 )
+
+type packetListenerWrapper struct {
+	client *outline.Client
+}
+
+func (w *packetListenerWrapper) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+	return w.client.ListenPacket(ctx)
+}
 
 func fetchSSConf(input string) (string, error) {
 	content := strings.TrimPrefix(input, "ssconf://")
@@ -53,7 +61,7 @@ func fetchSSConf(input string) (string, error) {
 			url = "https://" + url
 		}
 		log.Printf("Fetching dynamic config from %s", url)
-		client := &http.Client{Timeout: 5 * time.Second}
+		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Get(url)
 		if err != nil {
 			return "", err
@@ -140,31 +148,37 @@ func main() {
 	}
 	defer client.EndSession()
 
-	// 1. Create SOCKS5 server with TCP and UDP support from Outline SDK
-	// PacketDialer handles UDP traffic through the tunnel
-	packetDialer := &transport.PacketListenerDialer{Listener: client}
-	srv, err := socks5server.NewServer(client, packetDialer)
-	if err != nil {
-		log.Fatalf("Failed to create SOCKS5 server: %v", err)
+	// Create SOCKS5 server using github.com/things-go/go-socks5
+	socks5Logger := log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags)
+	if !verbose {
+		socks5Logger.SetOutput(io.Discard)
 	}
 
-	// 2. Start SOCKS5 server (Immediate)
-	listener, err := net.Listen("tcp", socksAddr)
-	if err != nil {
-		log.Fatalf("Failed to listen on %s: %v", socksAddr, err)
-	}
+	srv := socks5.NewServer(
+		socks5.WithLogger(socks5.NewLogger(socks5Logger)),
+		socks5.WithDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if verbose {
+				log.Printf("Dialing %s %s", network, addr)
+			}
+			return client.DialStream(ctx, addr)
+		}),
+	)
+
+	// Listen for signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		log.Printf("Outline CLI starting SOCKS5 proxy on %s (TCP/UDP, IPv4/IPv6)", socksAddr)
-		if err := srv.Serve(listener); err != nil {
+		if err := srv.ListenAndServe("tcp", socksAddr); err != nil {
 			log.Fatalf("SOCKS5 server failed: %v", err)
 		}
 	}()
 
-	// 3. Delayed/Optional Connectivity Check in background
+	// Delayed/Optional Connectivity Check in background
 	if !skipCheck {
 		go func() {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 			log.Println("Performing background connectivity check...")
 			
 			// TCP Check
@@ -175,8 +189,9 @@ func main() {
 				log.Println("TCP Connectivity check: OK")
 			}
 
-			// UDP Check (client now implements transport.PacketListener)
-			udpErr := connectivity.CheckUDPConnectivity(client)
+			// UDP Check
+			pl := &packetListenerWrapper{client}
+			udpErr := connectivity.CheckUDPConnectivity(pl)
 			if udpErr != nil {
 				log.Printf("Warning: UDP Connectivity check failed: %v", udpErr)
 			} else {
@@ -185,9 +200,6 @@ func main() {
 		}()
 	}
 
-	// Wait for exit
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	<-sigCh
 	log.Println("Shutting down...")
 }
