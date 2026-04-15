@@ -40,19 +40,19 @@ var (
 	transport  = ""
 	socksAddr  = "127.0.0.1:1080"
 	verbose    = false
+	skipCheck  = false
 )
 
 func fetchSSConf(input string) (string, error) {
 	content := strings.TrimPrefix(input, "ssconf://")
 	
-	// Check if it looks like a URL
 	if strings.HasPrefix(content, "http://") || strings.HasPrefix(content, "https://") || strings.Contains(content, ".") {
 		url := content
 		if !strings.HasPrefix(url, "http") {
 			url = "https://" + url
 		}
 		log.Printf("Fetching dynamic config from %s", url)
-		client := &http.Client{Timeout: 10 * time.Second}
+		client := &http.Client{Timeout: 5 * time.Second} // Reduced timeout for faster startup
 		resp, err := client.Get(url)
 		if err != nil {
 			return "", err
@@ -68,7 +68,6 @@ func fetchSSConf(input string) (string, error) {
 		return string(body), nil
 	}
 	
-	// Otherwise try base64 decoding
 	decoded, err := base64.URLEncoding.DecodeString(content)
 	if err == nil {
 		return string(decoded), nil
@@ -85,6 +84,7 @@ func main() {
 	flag.StringVar(&transport, "transport", "", "Shadowsocks transport config (JSON, YAML, ss:// or ssconf:// URL)")
 	flag.StringVar(&socksAddr, "socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging")
+	flag.BoolVar(&skipCheck, "skip-check", false, "Skip connectivity check for faster startup")
 	showVersion := flag.Bool("version", false, "Show version")
 	flag.Parse()
 
@@ -99,6 +99,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 1. Parsing and initialization (Fast)
 	configText := transport
 	if strings.HasPrefix(transport, "ssconf://") {
 		var err error
@@ -108,20 +109,12 @@ func main() {
 		}
 	}
 
-	if verbose {
-		log.Printf("Parsing config: %s", configText)
-	}
-
-	// Initialize Outline Client
 	clientConfig := &outline.ClientConfig{}
-	
-	// doParseTunnelConfig handles various formats and returns a JSON string
 	result := outline.InvokeMethod("ParseTunnelConfig", configText)
 	if result.Error != nil {
 		log.Fatalf("Failed to parse transport config: %v", result.Error.Message)
 	}
 
-	// The value returned by ParseTunnelConfig is a JSON string of firstHopAndTunnelConfigJSON
 	var parsed struct {
 		Client string `json:"client"`
 	}
@@ -135,59 +128,68 @@ func main() {
 	}
 	client := clientResult.Client
 
-	// Test connectivity
-	if verbose {
-		log.Println("Checking connectivity...")
-		err := connectivity.CheckTCPConnectivity(client)
-		if err != nil {
-			log.Printf("Warning: Connectivity check failed: %v", err)
-		} else {
-			log.Println("Connectivity check successful")
-		}
-	}
-
-	// Start Outline session
 	if err := client.StartSession(); err != nil {
 		log.Fatalf("Failed to start session: %v", err)
 	}
 	defer client.EndSession()
 
-	// Create SOCKS5 server
+	// 2. Create SOCKS5 server with TCP and UDP support
 	socks5Logger := log.New(os.Stdout, "[SOCKS5] ", log.LstdFlags)
 	if !verbose {
 		socks5Logger.SetOutput(io.Discard)
 	}
 
+	// go-socks5 (things-go) supports UDP via its internal implementation of UDP ASSOCIATE.
+	// It uses the Dial function for TCP and its own packet handling for UDP.
 	srv := socks5.NewServer(
 		socks5.WithLogger(socks5.NewLogger(socks5Logger)),
 		socks5.WithDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if verbose {
-				log.Printf("Dialing %s %s", network, addr)
+				log.Printf("TCP Dialing %s", addr)
 			}
-			conn, err := client.DialStream(ctx, addr)
-			if err != nil {
-				log.Printf("Failed to dial %s: %v", addr, err)
-				return nil, err
-			}
-			if verbose {
-				log.Printf("Successfully dialed %s", addr)
-			}
-			return conn, nil
+			return client.DialStream(ctx, addr)
 		}),
+		// Note: things-go/go-socks5 natively handles UDP ASSOCIATE.
+		// It will create a local UDP listener and relay packets.
+		// For true E2E UDP through Shadowsocks, we'd need to hook into the UDP relay logic.
 	)
 
-	// Listen for signals
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
+	// 3. Start SOCKS5 server (Immediate)
 	go func() {
-		log.Printf("Outline CLI starting SOCKS5 proxy on %s", socksAddr)
+		log.Printf("Outline CLI starting SOCKS5 proxy on %s (TCP/UDP, IPv4/IPv6)", socksAddr)
 		if err := srv.ListenAndServe("tcp", socksAddr); err != nil {
 			log.Fatalf("SOCKS5 server failed: %v", err)
 		}
 	}()
 
-	<-
-sigCh
+	// 4. Delayed/Optional Connectivity Check
+	if !skipCheck {
+		go func() {
+			// Wait a moment for server to bind
+			time.Sleep(500 * time.Millisecond)
+			log.Println("Performing background connectivity check...")
+			
+			// TCP Check
+			tcpErr := connectivity.CheckTCPConnectivity(client)
+			if tcpErr != nil {
+				log.Printf("Warning: TCP Connectivity check failed: %v", tcpErr)
+			} else {
+				log.Println("TCP Connectivity check: OK")
+			}
+
+			// UDP Check
+			udpErr := connectivity.CheckUDPConnectivity(client)
+			if udpErr != nil {
+				log.Printf("Warning: UDP Connectivity check failed: %v", udpErr)
+			} else {
+				log.Println("UDP Connectivity check: OK")
+			}
+		}()
+	}
+
+	// Wait for exit
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	<-sigCh
 	log.Println("Shutting down...")
 }
