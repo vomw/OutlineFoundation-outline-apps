@@ -16,15 +16,19 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/things-go/go-socks5"
 	"localhost/client/go/outline"
@@ -38,8 +42,47 @@ var (
 	verbose    = false
 )
 
+func fetchSSConf(input string) (string, error) {
+	content := strings.TrimPrefix(input, "ssconf://")
+	
+	// Check if it looks like a URL
+	if strings.HasPrefix(content, "http://") || strings.HasPrefix(content, "https://") || strings.Contains(content, ".") {
+		url := content
+		if !strings.HasPrefix(url, "http") {
+			url = "https://" + url
+		}
+		log.Printf("Fetching dynamic config from %s", url)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Get(url)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("bad status: %s", resp.Status)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+		return string(body), nil
+	}
+	
+	// Otherwise try base64 decoding
+	decoded, err := base64.URLEncoding.DecodeString(content)
+	if err == nil {
+		return string(decoded), nil
+	}
+	decoded, err = base64.StdEncoding.DecodeString(content)
+	if err == nil {
+		return string(decoded), nil
+	}
+	
+	return "", fmt.Errorf("invalid ssconf format")
+}
+
 func main() {
-	flag.StringVar(&transport, "transport", "", "Shadowsocks transport config (JSON, YAML, or ss:// URL)")
+	flag.StringVar(&transport, "transport", "", "Shadowsocks transport config (JSON, YAML, ss:// or ssconf:// URL)")
 	flag.StringVar(&socksAddr, "socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging")
 	showVersion := flag.Bool("version", false, "Show version")
@@ -56,11 +99,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	configText := transport
+	if strings.HasPrefix(transport, "ssconf://") {
+		var err error
+		configText, err = fetchSSConf(transport)
+		if err != nil {
+			log.Fatalf("Failed to handle ssconf: %v", err)
+		}
+	}
+
+	if verbose {
+		log.Printf("Parsing config: %s", configText)
+	}
+
 	// Initialize Outline Client
 	clientConfig := &outline.ClientConfig{}
 	
 	// doParseTunnelConfig handles various formats and returns a JSON string
-	result := outline.InvokeMethod("ParseTunnelConfig", transport)
+	result := outline.InvokeMethod("ParseTunnelConfig", configText)
 	if result.Error != nil {
 		log.Fatalf("Failed to parse transport config: %v", result.Error.Message)
 	}
@@ -108,7 +164,15 @@ func main() {
 			if verbose {
 				log.Printf("Dialing %s %s", network, addr)
 			}
-			return client.DialStream(ctx, addr)
+			conn, err := client.DialStream(ctx, addr)
+			if err != nil {
+				log.Printf("Failed to dial %s: %v", addr, err)
+				return nil, err
+			}
+			if verbose {
+				log.Printf("Successfully dialed %s", addr)
+			}
+			return conn, nil
 		}),
 	)
 
@@ -123,6 +187,7 @@ func main() {
 		}
 	}()
 
-	<-sigCh
+	<-
+sigCh
 	log.Println("Shutting down...")
 }
