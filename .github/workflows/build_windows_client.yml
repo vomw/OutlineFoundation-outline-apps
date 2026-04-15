@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build Outline Client / Windows
+name: Build Outline CLI / Windows
 
 on:
   push:
@@ -26,25 +26,15 @@ on:
 
 jobs:
   build:
-    name: Build Windows Client
+    name: Build Windows CLI
     runs-on: windows-2025
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - name: Support longpaths
         run: git config --system core.longpaths true
 
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ./package-lock.json
-
-      - name: Install NPM Dependencies
-        run: npm ci
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -60,14 +50,13 @@ jobs:
           version: 0.13.0
           use-cache: false
 
-      - name: Build Windows Client
-        run: npm run action client/electron/build windows
+      - name: Build Windows CLI
+        run: |
+          go tool task -v client:socks5-proxy:windows
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Outline-Client-Windows
+          name: Outline-CLI-Windows
           path: |
-            output/client/electron/build/*.zip
-            output/client/electron/build/*.exe
-            output/client/electron/build/*.blockmap
+            output/client/windows-386/outline-cli.exe
