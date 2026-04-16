@@ -89,7 +89,7 @@ func fetchSSConf(input string) (string, error) {
 }
 
 func main() {
-	flag.StringVar(&transportConf, "transport", "", "Shadowsocks transport config (JSON, YAML, ss:// or ssconf:// URL)")
+	flag.StringVar(&transportConf, "transport", "", "Shadowsocks transport config (File path, JSON, YAML, ss:// or ssconf:// URL)")
 	flag.StringVar(&socksAddr, "socks", "127.0.0.1:1080", "SOCKS5 listen address")
 	flag.BoolVar(&verbose, "v", false, "Enable verbose logging")
 	flag.BoolVar(&skipCheck, "skip-check", false, "Skip connectivity check for faster startup")
@@ -108,7 +108,19 @@ func main() {
 	}
 
 	configText := transportConf
-	if strings.HasPrefix(transportConf, "ssconf://") {
+
+	// 1. Check if transportConf is a local file
+	if _, err := os.Stat(transportConf); err == nil {
+		if verbose {
+			log.Printf("Loading config from file: %s", transportConf)
+		}
+		content, err := os.ReadFile(transportConf)
+		if err != nil {
+			log.Fatalf("Failed to read config file: %v", err)
+		}
+		configText = string(content)
+	} else if strings.HasPrefix(transportConf, "ssconf://") {
+		// 2. Handle ssconf URLs
 		var err error
 		configText, err = fetchSSConf(transportConf)
 		if err != nil {
@@ -117,7 +129,7 @@ func main() {
 	}
 
 	if verbose {
-		log.Printf("Parsing config: %s", configText)
+		log.Printf("Parsing config source...")
 	}
 
 	// Initialize Outline Client
@@ -169,8 +181,6 @@ func main() {
 
 	go func() {
 		log.Printf("Outline CLI starting SOCKS5 proxy on %s (TCP/UDP, IPv4/IPv6)", socksAddr)
-		// Note: UDP support in things-go/go-socks5 is currently using direct networking.
-		// For true E2E UDP tunneling through Shadowsocks, a custom SOCKS5 server is needed.
 		if err := srv.ListenAndServe("tcp", socksAddr); err != nil {
 			log.Fatalf("SOCKS5 server failed: %v", err)
 		}
