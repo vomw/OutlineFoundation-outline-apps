@@ -26,7 +26,7 @@ tasks:
     internal: true
     requires: {vars: [TARGET_OS, TARGET_ARCH, ZIG_TARGET]}
     vars:
-      CLI_VERSION: "v1.0.0-cli"
+      CLI_VERSION: '{{.CLI_VERSION | default "v1.0.0-cli"}}'
       OUTPUT: '{{.OUT_DIR}}/{{.TARGET_OS}}-{{.TARGET_ARCH}}/outline-cli{{if eq .TARGET_OS "windows"}}.exe{{end}}'
     cmds:
       - rm -rf "{{dir .OUTPUT}}" && mkdir -p "{{dir .OUTPUT}}"

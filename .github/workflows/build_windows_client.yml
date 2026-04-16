@@ -50,13 +50,25 @@ jobs:
           version: 0.13.0
           use-cache: false
 
+      - name: Generate Version String
+        id: version
+        shell: bash
+        run: |
+          VERSION_DATE=$(date +'%Y%m%d-%H%M')
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          VERSION="${VERSION_DATE}-${COMMIT_HASH}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Build Windows CLI
+        env:
+          CLI_VERSION: v${{ env.VERSION }}
         run: |
           go tool task -v client:socks5-proxy:windows
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Outline-CLI-Windows
+          name: Outline-CLI-Windows-v${{ env.VERSION }}
           path: |
             output/client/windows-386/outline-cli.exe
